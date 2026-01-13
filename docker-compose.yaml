@@ -1,0 +1,15 @@
+services:
+  redis:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: redis-8.2.3-custom
+    container_name: grapgraph-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  redis-data:
