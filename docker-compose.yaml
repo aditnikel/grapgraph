@@ -1,15 +1,34 @@
 services:
-  redis:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    image: redis-8.2.3-custom
-    container_name: grapgraph-redis
-    ports:
-      - "6379:6379"
+  redis-1:
+    image: falkordb/falkordb:edge
+    ports: ["7001:6379"]
     volumes:
-      - redis-data:/data
+      - redis-1-data:/data
+    command: >
+      redis-server
+      --cluster-enabled yes
+      --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+    restart: unless-stopped
+
+  redis-2:
+    image: falkordb/falkordb:edge
+    ports: ["7002:6379"]
+    volumes:
+      - redis-2-data:/data
+    command: redis-server --cluster-enabled yes
+    restart: unless-stopped
+
+  redis-3:
+    image: falkordb/falkordb:edge
+    ports: ["7003:6379"]
+    volumes:
+      - redis-3-data:/data
+    command: redis-server --cluster-enabled yes
     restart: unless-stopped
 
 volumes:
-  redis-data:
+  redis-1-data:
+  redis-2-data:
+  redis-3-data:
