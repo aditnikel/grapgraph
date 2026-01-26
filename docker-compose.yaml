@@ -2,6 +2,14 @@ services:
   redis-1:
     image: falkordb/falkordb:edge
     ports: ["7001:6379"]
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 500M
+        reservations:
+          cpus: "0.5"
+          memory: 200M
     volumes:
       - redis-1-data:/data
     command: >
@@ -15,6 +23,14 @@ services:
   redis-2:
     image: falkordb/falkordb:edge
     ports: ["7002:6379"]
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 500M
+        reservations:
+          cpus: "0.5"
+          memory: 200M
     volumes:
       - redis-2-data:/data
     command: redis-server --cluster-enabled yes
@@ -23,6 +39,14 @@ services:
   redis-3:
     image: falkordb/falkordb:edge
     ports: ["7003:6379"]
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 500M
+        reservations:
+          cpus: "0.5"
+          memory: 200M
     volumes:
       - redis-3-data:/data
     command: redis-server --cluster-enabled yes

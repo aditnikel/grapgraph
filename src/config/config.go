@@ -1,72 +1,101 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
+	"time"
 )
 
 type Config struct {
-	RedisAddr string
-	LedgerID  string
-	Goal      string
+	HTTPAddr string
 
-	EnableStreams bool
-	EnableBFS     bool
+	RedisAddrs    []string
+	RedisPassword string
+	GraphName     string
 
-	BFSMaxDepth      int
-	BFSTimeWindowSec int64
-	BFSResultLimit   int
-	BFSMaxFanout     int
-	BFSMaxVisits     int
+	DBTimeout time.Duration
+	LogLevel  string
 
-	ConsumerGroup string
-	ConsumerName  string
+	// Default graph query behavior (used when request omits/zero)
+	DefaultMaxNodes      int
+	DefaultMaxEdges      int
+	DefaultMinEventCount int
+	DefaultRankBy        string
 }
 
-func Load() Config {
-	return Config{
-		RedisAddr: os.Getenv("REDIS_ADDR"),
-		LedgerID:  os.Getenv("LEDGER_ID"),
-		Goal:      envStr("GOAL", "fraud"),
-
-		EnableStreams: envBool("ENABLE_STREAMS", true),
-		EnableBFS:     envBool("ENABLE_BFS", true),
-
-		BFSMaxDepth:      envInt("BFS_MAX_DEPTH", 3),
-		BFSTimeWindowSec: envInt64("BFS_TIME_WINDOW_SEC", 3600),
-		BFSResultLimit:   envInt("BFS_RESULT_LIMIT", 10),
-		BFSMaxFanout:     envInt("BFS_MAX_FANOUT", 50),
-		BFSMaxVisits:     envInt("BFS_MAX_VISITS", 1000),
-
-		ConsumerGroup: envStr("CONSUMER_GROUP", "bfs"),
-		ConsumerName:  envStr("CONSUMER_NAME", "worker-1"),
+func Load() (Config, error) {
+	c := Config{
+		HTTPAddr:      envStr("HTTP_ADDR", ":8080"),
+		RedisPassword: os.Getenv("REDIS_PASSWORD"),
+		GraphName:     envStr("GRAPH_NAME", "fraudnet"),
+		LogLevel:      envStr("LOG_LEVEL", "info"),
 	}
+
+	addrs := envStr("REDIS_ADDRS", "localhost:6379")
+	c.RedisAddrs = splitCSV(addrs)
+
+	toMS := envInt("DB_TIMEOUT_MS", 1500)
+	c.DBTimeout = time.Duration(toMS) * time.Millisecond
+
+	c.DefaultMaxNodes = envInt("DEFAULT_MAX_NODES", 200)
+	c.DefaultMaxEdges = envInt("DEFAULT_MAX_EDGES", 400)
+	c.DefaultMinEventCount = envInt("DEFAULT_MIN_EVENT_COUNT", 1)
+	c.DefaultRankBy = envStr("DEFAULT_RANK_BY", "event_count_30d")
+
+	if len(c.RedisAddrs) == 0 {
+		return Config{}, fmt.Errorf("REDIS_ADDRS must not be empty")
+	}
+	if c.GraphName == "" {
+		return Config{}, fmt.Errorf("GRAPH_NAME must not be empty")
+	}
+
+	if c.DefaultMaxNodes <= 0 {
+		c.DefaultMaxNodes = 200
+	}
+	if c.DefaultMaxEdges <= 0 {
+		c.DefaultMaxEdges = 400
+	}
+	if c.DefaultMinEventCount <= 0 {
+		c.DefaultMinEventCount = 1
+	}
+	switch c.DefaultRankBy {
+	case "event_count_30d", "event_count", "total_amount":
+	default:
+		c.DefaultRankBy = "event_count_30d"
+	}
+
+	return c, nil
+}
+
+func splitCSV(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func envStr(k, d string) string {
-	if v := os.Getenv(k); v != "" {
+	if v := strings.TrimSpace(os.Getenv(k)); v != "" {
 		return v
 	}
 	return d
 }
-func envBool(k string, d bool) bool {
-	if v := os.Getenv(k); v != "" {
-		b, _ := strconv.ParseBool(v)
-		return b
-	}
-	return d
-}
+
 func envInt(k string, d int) int {
-	if v := os.Getenv(k); v != "" {
-		i, _ := strconv.Atoi(v)
-		return i
+	v := strings.TrimSpace(os.Getenv(k))
+	if v == "" {
+		return d
 	}
-	return d
-}
-func envInt64(k string, d int64) int64 {
-	if v := os.Getenv(k); v != "" {
-		i, _ := strconv.ParseInt(v, 10, 64)
-		return i
+	i, err := strconv.Atoi(v)
+	if err != nil {
+		return d
 	}
-	return d
+	return i
 }
