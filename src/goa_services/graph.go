@@ -1,0 +1,92 @@
+package goa_services
+
+import (
+	"context"
+
+	"github.com/aditnikel/grapgraph/gen/graph"
+	"github.com/aditnikel/grapgraph/src/model"
+	"github.com/aditnikel/grapgraph/src/service"
+)
+
+type GraphService struct {
+	Graph *service.GraphService
+}
+
+func (s *GraphService) GetMetadata(ctx context.Context) (*graph.MetadataResponse, error) {
+	ets := make([]string, 0, len(model.AllEventTypes()))
+	for _, e := range model.AllEventTypes() {
+		ets = append(ets, string(e))
+	}
+
+	return &graph.MetadataResponse{
+		NodeTypes: []string{
+			string(model.NodeUser),
+			string(model.NodeMerchant),
+			string(model.NodeExchange),
+			string(model.NodeWallet),
+			string(model.NodePaymentMethod),
+			string(model.NodeBank),
+			string(model.NodeDevice),
+		},
+		EdgeTypes: ets,
+		RankMetrics: []string{
+			"event_count_30d",
+			"event_count",
+			"total_amount",
+		},
+	}, nil
+}
+
+func (s *GraphService) PostSubgraph(ctx context.Context, p *graph.SubgraphRequest) (*graph.SubgraphResponse, error) {
+	req := model.SubgraphRequest{
+		Hops:            p.Hops,
+		EdgeTypes:       p.EdgeTypes,
+		MinEventCount:   p.MinEventCount,
+		RankNeighborsBy: p.RankNeighborsBy,
+	}
+
+	req.Root.Type = p.Root.Type
+	req.Root.Key = p.Root.Key
+
+	req.TimeWindow.From = p.TimeWindow.From
+	req.TimeWindow.To = p.TimeWindow.To
+
+	req.Limit.MaxNodes = p.Limit.MaxNodes
+	req.Limit.MaxEdges = p.Limit.MaxEdges
+
+	resp, err := s.Graph.Subgraph(ctx, req)
+	if err != nil {
+		return nil, graph.BadRequest(err.Error())
+	}
+
+	nodes := make([]*graph.GraphNode, len(resp.Nodes))
+	for i, n := range resp.Nodes {
+		nodes[i] = &graph.GraphNode{
+			ID:    n.ID,
+			Type:  n.Type,
+			Key:   n.Key,
+			Label: n.Label,
+			Props: n.Props,
+		}
+	}
+
+	edges := make([]*graph.GraphEdge, len(resp.Edges))
+	for i, e := range resp.Edges {
+		edges[i] = &graph.GraphEdge{
+			ID:       e.ID,
+			Type:     e.Type,
+			From:     e.From,
+			To:       e.To,
+			Directed: e.Directed,
+			Metrics:  e.Metrics,
+		}
+	}
+
+	return &graph.SubgraphResponse{
+		Version:   resp.Version,
+		Root:      resp.Root,
+		Nodes:     nodes,
+		Edges:     edges,
+		Truncated: resp.Truncated,
+	}, nil
+}

@@ -7,23 +7,20 @@
 ## 🚀 Key Features
 
 - **Real-time Event Ingestion**: Aggregated upserts of user events (Logins, Payments, Withdrawals, etc.) into a graph structure.
-- **Multi-Hop Subgraph Analysis**: Budget-aware graph traversal (up to 3 hops) to detect relationships between users and shared entities (Devices, Wallets, Banks).
-- **Advanced Cypher Templates**: Utilization of localized Cypher blocks for conditional aggregations and time-windowed metrics.
-- **Budget-Aware Traversal**: Automatic truncation and neighbor ranking to ensure high performance even on massive graphs.
-- **Modern Tech Stack**:
-  - **Go 1.25**: Leveraging the latest Go performance and features.
-  - **Rueidis**: High-performance Redis client with support for FalkorDB commands.
-  - **Chi Router**: Clean and lightweight HTTP routing.
-  - **Structured Logging**: JSON-based logging with configurable levels and context.
-  - **Panic Recovery**: Robust middleware to catch and log panics with full stack traces.
+- **Industrial-Grade API Framework**: Rebuilt with **Goa v3** for design-first API development, providing automatic validation and OpenAPI documentation.
+- **Modern Spider-Web UI**: A premium D3.js powered dark-mode visualization tool with glassmorphism panels, relationship directionality (arrows), and entity icons.
+- **Real-time Event Ingestion**: Aggregated upserts of user events (Logins, Payments, Withdrawals, etc.) into a graph structure.
+- **Budget-Aware Subgraph Analysis**: Performant multi-hop traversal (up to 3 hops) with neighbor ranking and automatic results truncation.
+- **Rich Seed Data**: Includes realistic fraud scenarios (Money mules, Bot networks, Account takeovers).
 
 ---
 
 ## 🏗️ Architecture
 
-- **Ingest Service**: Processes customer events and maintains an aggregated graph of relationships between users and entities.
-- **Graph Service**: Handles complex traversal requests, applying time windows, min-event counts, and ranking metrics to extract relevant subgraphs.
-- **FalkorDB**: High-speed graph database built on Redis, enabling Cypher query execution at memory speeds.
+- **Goa v3 Layer**: Defines the API DSL in `/design`, generating type-safe controllers and transport encoders/decoders.
+- **Business Services**: Core logic in `src/service/` handles graph traversals and ingestion rules.
+- **FalkorDB Repository**: High-performance interaction with Redis Graph using localized Cypher blocks.
+- **Web Frontend**: Modern single-page application using D3.js and responsive CSS.
 
 ---
 
@@ -123,13 +120,15 @@
 ## 📂 Project Structure
 
 - `cmd/`: Application entry points (`api`, `seed`).
+- `design/`: Goa v3 API Design DSL.
+- `gen/`: Re-generatable Goa boilerplate (HTTP, endpoints, types).
 - `src/`: Core logic organized by domain.
-  - `graph/`: Redis interaction and Cypher query templates.
-  - `service/`: Business logic for Ingest and Subgraph analysis.
-  - `httpapi/`: HTTP handlers, router, and middleware.
-  - `model/`: DTOs and shared enums.
-  - `observability/`: Logging and monitoring utilities.
-- `test/`: Integration tests.
+  - `goa_services/`: Wrappers implementing Goa interfaces.
+  - `service/`: Core business logic (Ingest and Graph).
+  - `graph/`: Redis interaction and Cypher templates.
+  - `model/`: Shared domain objects and DTOs.
+  - `observability/`: Logging and monitoring.
+- `web/`: Modern D3 visualization interface.
 
 ---
 

@@ -24,6 +24,23 @@ func New(rdb rueidis.Client, graphName string, timeout time.Duration) *Repo {
 	return &Repo{rdb: rdb, graphName: graphName, timeout: timeout}
 }
 
+func (g *Repo) interpolate(query string, params map[string]any) string {
+	for k, v := range params {
+		placeholder := "$" + k
+		var val string
+		switch x := v.(type) {
+		case string:
+			val = fmt.Sprintf("'%s'", strings.ReplaceAll(x, "'", "\\'"))
+		case int, int64, float64:
+			val = fmt.Sprintf("%v", x)
+		default:
+			val = fmt.Sprintf("'%v'", x)
+		}
+		query = strings.ReplaceAll(query, placeholder, val)
+	}
+	return query
+}
+
 func (g *Repo) Ping(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, g.timeout)
 	defer cancel()
@@ -43,7 +60,7 @@ func (g *Repo) EnsureSchema(ctx context.Context) {
 		cypher.CreateDeviceIndex,
 	}
 	for _, q := range queries {
-		_ = g.exec(ctx, q, nil, false)
+		_ = g.exec(ctx, q, false)
 	}
 }
 
@@ -81,20 +98,20 @@ func (g *Repo) UpsertAggregated(ctx context.Context, ev model.CustomerEvent, et 
 		moneyBlock,
 	)
 
-	return g.exec(ctx, query, params, true)
+	query = g.interpolate(query, params)
+
+	return g.exec(ctx, query, true)
 }
 
 func (g *Repo) SubgraphHop(ctx context.Context, query string, params map[string]any) (any, error) {
 	ctx, cancel := context.WithTimeout(ctx, g.timeout)
 	defer cancel()
 
-	args := []string{g.graphName, query, "--compact"}
 	if len(params) > 0 {
-		args = append(args, "PARAMS")
-		for k, v := range params {
-			args = append(args, k, fmt.Sprintf("%v", v))
-		}
+		query = g.interpolate(query, params)
 	}
+
+	args := []string{g.graphName, query, "--compact"}
 	cmd := g.rdb.B().Arbitrary("GRAPH.QUERY").Args(args...).Build()
 	res := g.rdb.Do(ctx, cmd)
 	if err := res.Error(); err != nil {
@@ -111,16 +128,10 @@ func (g *Repo) QueryRows(ctx context.Context, query string, params map[string]an
 	return ParseCompact(respAny)
 }
 
-func (g *Repo) exec(ctx context.Context, query string, params map[string]any, compact bool) error {
+func (g *Repo) exec(ctx context.Context, query string, compact bool) error {
 	args := []string{g.graphName, query}
 	if compact {
 		args = append(args, "--compact")
-	}
-	if len(params) > 0 {
-		args = append(args, "PARAMS")
-		for k, v := range params {
-			args = append(args, k, fmt.Sprintf("%v", v))
-		}
 	}
 	cmd := g.rdb.B().Arbitrary("GRAPH.QUERY").Args(args...).Build()
 	return g.rdb.Do(ctx, cmd).Error()
