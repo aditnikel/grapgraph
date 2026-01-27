@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/aditnikel/grapgraph/gen/graph"
+	"github.com/aditnikel/grapgraph/src/domain"
 	"github.com/aditnikel/grapgraph/src/model"
-	"github.com/aditnikel/grapgraph/src/service"
 )
 
 type GraphService struct {
-	Graph *service.GraphService
+	Graph *domain.GraphService
 }
 
 func (s *GraphService) GetMetadata(ctx context.Context) (*graph.MetadataResponse, error) {

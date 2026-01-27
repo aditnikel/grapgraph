@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/aditnikel/grapgraph/gen/ingest"
+	"github.com/aditnikel/grapgraph/src/domain"
 	"github.com/aditnikel/grapgraph/src/model"
-	"github.com/aditnikel/grapgraph/src/service"
 )
 
 type IngestService struct {
-	Ingest *service.IngestService
+	Ingest *domain.IngestService
 }
 
 func (s *IngestService) PostEvent(ctx context.Context, p *ingest.CustomerEvent) (*ingest.IngestResponse, error) {

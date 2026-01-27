@@ -4,13 +4,13 @@ import (
 	"context"
 
 	"github.com/aditnikel/grapgraph/gen/health"
+	"github.com/aditnikel/grapgraph/src/domain"
 	"github.com/aditnikel/grapgraph/src/observability"
-	"github.com/aditnikel/grapgraph/src/service"
 )
 
 type HealthService struct {
 	Log   *observability.Logger
-	Graph *service.GraphService
+	Graph *domain.GraphService
 }
 
 func (s *HealthService) Get(ctx context.Context) (*health.HealthResponse, error) {

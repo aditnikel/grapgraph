@@ -21,11 +21,11 @@ import (
 	"github.com/aditnikel/grapgraph/gen/ingest"
 	"github.com/aditnikel/grapgraph/gen/openapi"
 	"github.com/aditnikel/grapgraph/src/config"
-	"github.com/aditnikel/grapgraph/src/goa_services"
+	"github.com/aditnikel/grapgraph/src/domain"
 	repo "github.com/aditnikel/grapgraph/src/graph"
 	custmid "github.com/aditnikel/grapgraph/src/httpapi/middleware"
 	"github.com/aditnikel/grapgraph/src/observability"
-	"github.com/aditnikel/grapgraph/src/service"
+	goa_services "github.com/aditnikel/grapgraph/src/services"
 )
 
 func main() {
@@ -51,8 +51,8 @@ func main() {
 	gRepo.EnsureSchema(context.Background())
 
 	// Initialize domain services
-	graphSvcBase := &service.GraphService{Repo: gRepo, Cfg: cfg}
-	ingestSvcBase := &service.IngestService{Repo: gRepo}
+	graphSvcBase := &domain.GraphService{Repo: gRepo, Cfg: cfg}
+	ingestSvcBase := &domain.IngestService{Repo: gRepo}
 
 	// Initialize Goa service wrappers
 	handler := buildHandler(log, graphSvcBase, ingestSvcBase)
@@ -74,7 +74,7 @@ func main() {
 	handleGracefulShutdown(log, srv)
 }
 
-func buildHandler(log *observability.Logger, graphSvcBase *service.GraphService, ingestSvcBase *service.IngestService) http.Handler {
+func buildHandler(log *observability.Logger, graphSvcBase *domain.GraphService, ingestSvcBase *domain.IngestService) http.Handler {
 	mux := goahttp.NewMuxer()
 	dec := goahttp.RequestDecoder
 	enc := goahttp.ResponseEncoder
