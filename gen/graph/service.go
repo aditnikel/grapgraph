@@ -36,7 +36,7 @@ const ServiceName = "graph"
 // MethodKey key.
 var MethodNames = [2]string{"get_metadata", "post_subgraph"}
 
-// A relationship between two entities with aggregated metrics.
+// A relationship between two entities.
 type GraphEdge struct {
 	// Unique ID for the specific relationship.
 	ID string
@@ -48,8 +48,6 @@ type GraphEdge struct {
 	To string
 	// Whether the relationship has a specific flow direction.
 	Directed bool
-	// Statistical snapshots (count, amount, first_seen, etc).
-	Metrics map[string]any
 }
 
 // A single entity (User, Merchant, Device) in the resulting subgraph.
@@ -72,8 +70,6 @@ type MetadataResponse struct {
 	NodeTypes []string
 	// All valid event types.
 	EdgeTypes []string
-	// Valid keys for the rank_neighbors_by parameter.
-	RankMetrics []string
 }
 
 // SubgraphRequest is the payload type of the graph service post_subgraph
@@ -88,19 +84,8 @@ type SubgraphRequest struct {
 	}
 	// Number of hops to traverse (1-3).
 	Hops int
-	// Optional time range to filter relationship metrics.
-	TimeWindow *struct {
-		// Start of the window (RFC3339).
-		From string
-		// End of the window (RFC3339).
-		To string
-	}
 	// Filter to only include these relationship types.
 	EdgeTypes []string
-	// Minimum number of aggregate events to include an edge.
-	MinEventCount int
-	// Metric used to sort and truncate neighbor nodes.
-	RankNeighborsBy string
 	// Resource budget for the response.
 	Limit *struct {
 		// Maximum number of nodes to return.

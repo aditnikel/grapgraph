@@ -15,6 +15,23 @@ import (
 // PostEventRequestBody is the type of the "ingest" service "post_event"
 // endpoint HTTP request body.
 type PostEventRequestBody struct {
+	// List of events to ingest in-order.
+	Events []*CustomerEventRequestBody `form:"events" json:"events" xml:"events"`
+}
+
+// PostEventResponseBody is the type of the "ingest" service "post_event"
+// endpoint HTTP response body.
+type PostEventResponseBody struct {
+	// Whether all events were processed successfully.
+	Accepted *bool `form:"accepted,omitempty" json:"accepted,omitempty" xml:"accepted,omitempty"`
+	// Number of events accepted in this batch.
+	AcceptedCount *int `form:"accepted_count,omitempty" json:"accepted_count,omitempty" xml:"accepted_count,omitempty"`
+	// Number of events rejected in this batch.
+	FailedCount *int `form:"failed_count,omitempty" json:"failed_count,omitempty" xml:"failed_count,omitempty"`
+}
+
+// CustomerEventRequestBody is used to define fields on request body types.
+type CustomerEventRequestBody struct {
 	// Unique identifier of the user (e.g. u_123).
 	UserID string `form:"user_id" json:"user_id" xml:"user_id"`
 	// Target merchant ID or card MPAN.
@@ -39,37 +56,32 @@ type PostEventRequestBody struct {
 	IPAddress *string `form:"ip_address,omitempty" json:"ip_address,omitempty" xml:"ip_address,omitempty"`
 }
 
-// PostEventResponseBody is the type of the "ingest" service "post_event"
-// endpoint HTTP response body.
-type PostEventResponseBody struct {
-	// Whether the event was successfully queued or processed.
-	Accepted *bool `form:"accepted,omitempty" json:"accepted,omitempty" xml:"accepted,omitempty"`
-}
-
 // NewPostEventRequestBody builds the HTTP request body from the payload of the
 // "post_event" endpoint of the "ingest" service.
-func NewPostEventRequestBody(p *ingest.CustomerEvent) *PostEventRequestBody {
-	body := &PostEventRequestBody{
-		UserID:                 p.UserID,
-		MerchantIDMpan:         p.MerchantIDMpan,
-		EventType:              p.EventType,
-		EventTimestamp:         p.EventTimestamp,
-		TotalTransactionAmount: p.TotalTransactionAmount,
-		DeviceID:               p.DeviceID,
-		PaymentMethod:          p.PaymentMethod,
-		IssuingBank:            p.IssuingBank,
-		WalletAddress:          p.WalletAddress,
-		Exchange:               p.Exchange,
-		IPAddress:              p.IPAddress,
+func NewPostEventRequestBody(p *ingest.BulkCustomerEvents) *PostEventRequestBody {
+	body := &PostEventRequestBody{}
+	if p.Events != nil {
+		body.Events = make([]*CustomerEventRequestBody, len(p.Events))
+		for i, val := range p.Events {
+			if val == nil {
+				body.Events[i] = nil
+				continue
+			}
+			body.Events[i] = marshalIngestCustomerEventToCustomerEventRequestBody(val)
+		}
+	} else {
+		body.Events = []*CustomerEventRequestBody{}
 	}
 	return body
 }
 
-// NewPostEventIngestResponseAccepted builds a "ingest" service "post_event"
-// endpoint result from a HTTP "Accepted" response.
-func NewPostEventIngestResponseAccepted(body *PostEventResponseBody) *ingest.IngestResponse {
-	v := &ingest.IngestResponse{
-		Accepted: *body.Accepted,
+// NewPostEventBulkIngestResponseAccepted builds a "ingest" service
+// "post_event" endpoint result from a HTTP "Accepted" response.
+func NewPostEventBulkIngestResponseAccepted(body *PostEventResponseBody) *ingest.BulkIngestResponse {
+	v := &ingest.BulkIngestResponse{
+		Accepted:      *body.Accepted,
+		AcceptedCount: *body.AcceptedCount,
+		FailedCount:   *body.FailedCount,
 	}
 
 	return v
@@ -88,6 +100,21 @@ func NewPostEventBadRequest(body string) ingest.BadRequest {
 func ValidatePostEventResponseBody(body *PostEventResponseBody) (err error) {
 	if body.Accepted == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("accepted", "body"))
+	}
+	if body.AcceptedCount == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("accepted_count", "body"))
+	}
+	if body.FailedCount == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("failed_count", "body"))
+	}
+	return
+}
+
+// ValidateCustomerEventRequestBody runs the validations defined on
+// CustomerEventRequestBody
+func ValidateCustomerEventRequestBody(body *CustomerEventRequestBody) (err error) {
+	if body.EventTimestamp == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("event_timestamp", "body"))
 	}
 	return
 }

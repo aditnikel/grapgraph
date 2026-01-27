@@ -37,7 +37,7 @@ func UsageCommands() []string {
 func UsageExamples() string {
 	return os.Args[0] + " " + "openapi index" + "\n" +
 		os.Args[0] + " " + "health get" + "\n" +
-		os.Args[0] + " " + "ingest post-event --body '{\n      \"device_id\": \"d_888\",\n      \"event_timestamp\": \"2024-03-20T10:00:00Z\",\n      \"event_type\": \"PAYMENT\",\n      \"exchange\": \"BINANCE\",\n      \"ip_address\": \"192.168.1.1\",\n      \"issuing_bank\": \"JP_MORGAN\",\n      \"merchant_id_mpan\": \"m_777\",\n      \"payment_method\": \"VISA\",\n      \"total_transaction_amount\": 150.5,\n      \"user_id\": \"u_123\",\n      \"wallet_address\": \"0xabc123\"\n   }'" + "\n" +
+		os.Args[0] + " " + "ingest post-event --body '{\n      \"events\": [\n         {\n            \"event_timestamp\": \"2024-03-20T10:00:00Z\",\n            \"event_type\": \"PAYMENT\",\n            \"merchant_id_mpan\": \"m_7\",\n            \"total_transaction_amount\": 125,\n            \"user_id\": \"u_1\"\n         },\n         {\n            \"event_timestamp\": 1710930030000,\n            \"event_type\": \"LOGIN\",\n            \"user_id\": \"u_2\"\n         }\n      ]\n   }'" + "\n" +
 		os.Args[0] + " " + "graph get-metadata" + "\n" +
 		""
 }
@@ -293,7 +293,7 @@ func ingestUsage() {
 	fmt.Fprintln(os.Stderr, `High-speed financial event ingestion service.`)
 	fmt.Fprintf(os.Stderr, "Usage:\n    %s [globalflags] ingest COMMAND [flags]\n\n", os.Args[0])
 	fmt.Fprintln(os.Stderr, "COMMAND:")
-	fmt.Fprintln(os.Stderr, `    post-event: Accepts a new financial event (Payment, Login, etc.) and updates the relationship graph.`)
+	fmt.Fprintln(os.Stderr, `    post-event: Accepts one or more financial events (Payment, Login, etc.) and updates the relationship graph.`)
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Additional help:")
 	fmt.Fprintf(os.Stderr, "    %s ingest COMMAND --help\n", os.Args[0])
@@ -306,14 +306,14 @@ func ingestPostEventUsage() {
 
 	// Description
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, `Accepts a new financial event (Payment, Login, etc.) and updates the relationship graph.`)
+	fmt.Fprintln(os.Stderr, `Accepts one or more financial events (Payment, Login, etc.) and updates the relationship graph.`)
 
 	// Flags list
 	fmt.Fprintln(os.Stderr, `    -body JSON: `)
 
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
-	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "ingest post-event --body '{\n      \"device_id\": \"d_888\",\n      \"event_timestamp\": \"2024-03-20T10:00:00Z\",\n      \"event_type\": \"PAYMENT\",\n      \"exchange\": \"BINANCE\",\n      \"ip_address\": \"192.168.1.1\",\n      \"issuing_bank\": \"JP_MORGAN\",\n      \"merchant_id_mpan\": \"m_777\",\n      \"payment_method\": \"VISA\",\n      \"total_transaction_amount\": 150.5,\n      \"user_id\": \"u_123\",\n      \"wallet_address\": \"0xabc123\"\n   }'")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "ingest post-event --body '{\n      \"events\": [\n         {\n            \"event_timestamp\": \"2024-03-20T10:00:00Z\",\n            \"event_type\": \"PAYMENT\",\n            \"merchant_id_mpan\": \"m_7\",\n            \"total_transaction_amount\": 125,\n            \"user_id\": \"u_1\"\n         },\n         {\n            \"event_timestamp\": 1710930030000,\n            \"event_type\": \"LOGIN\",\n            \"user_id\": \"u_2\"\n         }\n      ]\n   }'")
 }
 
 // graphUsage displays the usage of the graph command and its subcommands.
@@ -358,5 +358,5 @@ func graphPostSubgraphUsage() {
 
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
-	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "graph post-subgraph --body '{\n      \"edge_types\": [\n         \"PAYMENT\",\n         \"LOGIN\"\n      ],\n      \"hops\": 2,\n      \"limit\": {\n         \"max_edges\": 100,\n         \"max_nodes\": 50\n      },\n      \"min_event_count\": 2,\n      \"rank_neighbors_by\": \"total_amount\",\n      \"root\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      },\n      \"time_window\": {\n         \"from\": \"2024-01-01T00:00:00Z\",\n         \"to\": \"2024-12-31T23:59:59Z\"\n      }\n   }'")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "graph post-subgraph --body '{\n      \"edge_types\": [\n         \"PAYMENT\",\n         \"LOGIN\"\n      ],\n      \"hops\": 2,\n      \"limit\": {\n         \"max_edges\": 100,\n         \"max_nodes\": 50\n      },\n      \"root\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      }\n   }'")
 }

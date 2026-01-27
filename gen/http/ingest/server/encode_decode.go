@@ -22,7 +22,7 @@ import (
 // ingest post_event endpoint.
 func EncodePostEventResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
 	return func(ctx context.Context, w http.ResponseWriter, v any) error {
-		res, _ := v.(*ingest.IngestResponse)
+		res, _ := v.(*ingest.BulkIngestResponse)
 		enc := encoder(ctx, w)
 		body := NewPostEventResponseBody(res)
 		w.WriteHeader(http.StatusAccepted)
@@ -32,8 +32,8 @@ func EncodePostEventResponse(encoder func(context.Context, http.ResponseWriter) 
 
 // DecodePostEventRequest returns a decoder for requests sent to the ingest
 // post_event endpoint.
-func DecodePostEventRequest(mux goahttp.Muxer, decoder func(*http.Request) goahttp.Decoder) func(*http.Request) (*ingest.CustomerEvent, error) {
-	return func(r *http.Request) (*ingest.CustomerEvent, error) {
+func DecodePostEventRequest(mux goahttp.Muxer, decoder func(*http.Request) goahttp.Decoder) func(*http.Request) (*ingest.BulkCustomerEvents, error) {
+	return func(r *http.Request) (*ingest.BulkCustomerEvents, error) {
 		var (
 			body PostEventRequestBody
 			err  error
@@ -53,7 +53,7 @@ func DecodePostEventRequest(mux goahttp.Muxer, decoder func(*http.Request) goaht
 		if err != nil {
 			return nil, err
 		}
-		payload := NewPostEventCustomerEvent(&body)
+		payload := NewPostEventBulkCustomerEvents(&body)
 
 		return payload, nil
 	}
@@ -81,4 +81,24 @@ func EncodePostEventError(encoder func(context.Context, http.ResponseWriter) goa
 			return encodeError(ctx, w, v)
 		}
 	}
+}
+
+// unmarshalCustomerEventRequestBodyToIngestCustomerEvent builds a value of
+// type *ingest.CustomerEvent from a value of type *CustomerEventRequestBody.
+func unmarshalCustomerEventRequestBodyToIngestCustomerEvent(v *CustomerEventRequestBody) *ingest.CustomerEvent {
+	res := &ingest.CustomerEvent{
+		UserID:                 *v.UserID,
+		MerchantIDMpan:         v.MerchantIDMpan,
+		EventType:              *v.EventType,
+		EventTimestamp:         v.EventTimestamp,
+		TotalTransactionAmount: v.TotalTransactionAmount,
+		DeviceID:               v.DeviceID,
+		PaymentMethod:          v.PaymentMethod,
+		IssuingBank:            v.IssuingBank,
+		WalletAddress:          v.WalletAddress,
+		Exchange:               v.Exchange,
+		IPAddress:              v.IPAddress,
+	}
+
+	return res
 }

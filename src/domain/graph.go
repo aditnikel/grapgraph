@@ -3,7 +3,6 @@ package domain
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/aditnikel/grapgraph/src/config"
 	"github.com/aditnikel/grapgraph/src/graph"
@@ -31,30 +30,11 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 		return model.SubgraphResponse{}, fmt.Errorf("hops must be 1..3")
 	}
 
-	// Defaults from config
-	if req.MinEventCount <= 0 {
-		req.MinEventCount = s.Cfg.DefaultMinEventCount
-	}
 	if req.Limit.MaxNodes <= 0 {
 		req.Limit.MaxNodes = s.Cfg.DefaultMaxNodes
 	}
 	if req.Limit.MaxEdges <= 0 {
 		req.Limit.MaxEdges = s.Cfg.DefaultMaxEdges
-	}
-	rank := req.RankNeighborsBy
-	if rank == "" {
-		rank = s.Cfg.DefaultRankBy
-	}
-
-	switch rank {
-	case "event_count_30d", "event_count", "total_amount":
-	default:
-		return model.SubgraphResponse{}, fmt.Errorf("invalid rank_neighbors_by")
-	}
-
-	minMetric := "event_count"
-	if rank == "event_count_30d" {
-		minMetric = "event_count_30d"
 	}
 
 	edgeTypes := make([]model.EventType, 0, len(req.EdgeTypes))
@@ -69,17 +49,6 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 		edgeTypes = model.AllEventTypes()
 	}
 	quotedEdgeTypes := graph.QuoteEdgeTypes(edgeTypes)
-
-	fromTS, err := time.Parse(time.RFC3339, req.TimeWindow.From)
-	if err != nil {
-		return model.SubgraphResponse{}, fmt.Errorf("invalid time_window.from RFC3339")
-	}
-	toTS, err := time.Parse(time.RFC3339, req.TimeWindow.To)
-	if err != nil {
-		return model.SubgraphResponse{}, fmt.Errorf("invalid time_window.to RFC3339")
-	}
-	fromMs := fromTS.UnixMilli()
-	toMs := toTS.UnixMilli()
 
 	nodes := map[string]model.GraphNode{}
 	edges := map[string]model.GraphEdge{}
@@ -119,7 +88,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 		return true
 	}
 
-	putEdge := func(fromType, fromKey, toType, toKey, edgeType string, metrics map[string]any) bool {
+	putEdge := func(fromType, fromKey, toType, toKey, edgeType string) bool {
 		if fromType == "" || fromKey == "" || toType == "" || toKey == "" || edgeType == "" {
 			return false
 		}
@@ -139,8 +108,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 			Type:     edgeType,
 			From:     fromID,
 			To:       toID,
-			Directed: false,
-			Metrics:  metrics,
+			Directed: true,
 		}
 		remainingEdges--
 		return true
@@ -204,13 +172,10 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 		if limit == 0 {
 			truncated = true
 		} else {
-			q := fmt.Sprintf(cypher.UserToEntityTemplate, quotedEdgeTypes, minMetric, rank)
+			q := fmt.Sprintf(cypher.UserToEntityTemplate, quotedEdgeTypes)
 			rows, err := s.Repo.QueryRows(ctx, q, map[string]any{
-				"user_id":   req.Root.Key,
-				"min_count": req.MinEventCount,
-				"from_ts":   fromMs,
-				"to_ts":     toMs,
-				"limit":     limit,
+				"user_id": req.Root.Key,
+				"limit":   limit,
 			})
 			if err != nil {
 				return model.SubgraphResponse{}, fmt.Errorf("graph query hop1 failed: %v", err)
@@ -232,7 +197,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 
 				_ = putNode(fromType, fromKey)
 				_ = putNode(toType, toKey)
-				_ = putEdge(fromType, fromKey, toType, toKey, et, buildMetrics(r))
+				_ = putEdge(fromType, fromKey, toType, toKey, et)
 
 				if eid, ok := s.resolveEntityInternalID(ctx, toType, toKey); ok {
 					entityFrontier = append(entityFrontier, entityRef{id: eid})
@@ -262,12 +227,9 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 					break
 				}
 
-				q := fmt.Sprintf(cypher.EntityToUserTemplate, quotedEdgeTypes, minMetric, rank)
+				q := fmt.Sprintf(cypher.EntityToUserTemplate, quotedEdgeTypes)
 				rows, err := s.Repo.QueryRows(ctx, q, map[string]any{
 					"entity_id": e.id,
-					"min_count": req.MinEventCount,
-					"from_ts":   fromMs,
-					"to_ts":     toMs,
 					"limit":     perEntity,
 				})
 				if err != nil {
@@ -290,7 +252,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 
 					_ = putNode(fromType, fromKey)
 					_ = putNode(toType, toKey)
-					_ = putEdge(fromType, fromKey, toType, toKey, et, buildMetrics(r))
+					_ = putEdge(fromType, fromKey, toType, toKey, et)
 
 					if _, ok := seenUsers[toKey]; !ok {
 						seenUsers[toKey] = struct{}{}
@@ -321,13 +283,10 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 					break
 				}
 
-				q := fmt.Sprintf(cypher.UserToEntityTemplate, quotedEdgeTypes, minMetric, rank)
+				q := fmt.Sprintf(cypher.UserToEntityTemplate, quotedEdgeTypes)
 				rows, err := s.Repo.QueryRows(ctx, q, map[string]any{
-					"user_id":   uid,
-					"min_count": req.MinEventCount,
-					"from_ts":   fromMs,
-					"to_ts":     toMs,
-					"limit":     perUser,
+					"user_id": uid,
+					"limit":   perUser,
 				})
 				if err != nil {
 					return model.SubgraphResponse{}, fmt.Errorf("graph query hop3 failed: %v", err)
@@ -349,7 +308,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 
 					_ = putNode(fromType, fromKey)
 					_ = putNode(toType, toKey)
-					_ = putEdge(fromType, fromKey, toType, toKey, et, buildMetrics(r))
+					_ = putEdge(fromType, fromKey, toType, toKey, et)
 
 					if remainingEdges <= 0 || remainingNodes <= 0 {
 						truncated = true

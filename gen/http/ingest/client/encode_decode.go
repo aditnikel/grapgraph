@@ -37,9 +37,9 @@ func (c *Client) BuildPostEventRequest(ctx context.Context, v any) (*http.Reques
 // post_event server.
 func EncodePostEventRequest(encoder func(*http.Request) goahttp.Encoder) func(*http.Request, any) error {
 	return func(req *http.Request, v any) error {
-		p, ok := v.(*ingest.CustomerEvent)
+		p, ok := v.(*ingest.BulkCustomerEvents)
 		if !ok {
-			return goahttp.ErrInvalidType("ingest", "post_event", "*ingest.CustomerEvent", v)
+			return goahttp.ErrInvalidType("ingest", "post_event", "*ingest.BulkCustomerEvents", v)
 		}
 		body := NewPostEventRequestBody(p)
 		if err := encoder(req).Encode(&body); err != nil {
@@ -83,7 +83,7 @@ func DecodePostEventResponse(decoder func(*http.Response) goahttp.Decoder, resto
 			if err != nil {
 				return nil, goahttp.ErrValidationError("ingest", "post_event", err)
 			}
-			res := NewPostEventIngestResponseAccepted(&body)
+			res := NewPostEventBulkIngestResponseAccepted(&body)
 			return res, nil
 		case http.StatusBadRequest:
 			var (
@@ -100,4 +100,44 @@ func DecodePostEventResponse(decoder func(*http.Response) goahttp.Decoder, resto
 			return nil, goahttp.ErrInvalidResponse("ingest", "post_event", resp.StatusCode, string(body))
 		}
 	}
+}
+
+// marshalIngestCustomerEventToCustomerEventRequestBody builds a value of type
+// *CustomerEventRequestBody from a value of type *ingest.CustomerEvent.
+func marshalIngestCustomerEventToCustomerEventRequestBody(v *ingest.CustomerEvent) *CustomerEventRequestBody {
+	res := &CustomerEventRequestBody{
+		UserID:                 v.UserID,
+		MerchantIDMpan:         v.MerchantIDMpan,
+		EventType:              v.EventType,
+		EventTimestamp:         v.EventTimestamp,
+		TotalTransactionAmount: v.TotalTransactionAmount,
+		DeviceID:               v.DeviceID,
+		PaymentMethod:          v.PaymentMethod,
+		IssuingBank:            v.IssuingBank,
+		WalletAddress:          v.WalletAddress,
+		Exchange:               v.Exchange,
+		IPAddress:              v.IPAddress,
+	}
+
+	return res
+}
+
+// marshalCustomerEventRequestBodyToIngestCustomerEvent builds a value of type
+// *ingest.CustomerEvent from a value of type *CustomerEventRequestBody.
+func marshalCustomerEventRequestBodyToIngestCustomerEvent(v *CustomerEventRequestBody) *ingest.CustomerEvent {
+	res := &ingest.CustomerEvent{
+		UserID:                 v.UserID,
+		MerchantIDMpan:         v.MerchantIDMpan,
+		EventType:              v.EventType,
+		EventTimestamp:         v.EventTimestamp,
+		TotalTransactionAmount: v.TotalTransactionAmount,
+		DeviceID:               v.DeviceID,
+		PaymentMethod:          v.PaymentMethod,
+		IssuingBank:            v.IssuingBank,
+		WalletAddress:          v.WalletAddress,
+		Exchange:               v.Exchange,
+		IPAddress:              v.IPAddress,
+	}
+
+	return res
 }

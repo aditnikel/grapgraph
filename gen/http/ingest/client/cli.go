@@ -17,33 +17,43 @@ import (
 
 // BuildPostEventPayload builds the payload for the ingest post_event endpoint
 // from CLI flags.
-func BuildPostEventPayload(ingestPostEventBody string) (*ingest.CustomerEvent, error) {
+func BuildPostEventPayload(ingestPostEventBody string) (*ingest.BulkCustomerEvents, error) {
 	var err error
 	var body PostEventRequestBody
 	{
 		err = json.Unmarshal([]byte(ingestPostEventBody), &body)
 		if err != nil {
-			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"device_id\": \"d_888\",\n      \"event_timestamp\": \"2024-03-20T10:00:00Z\",\n      \"event_type\": \"PAYMENT\",\n      \"exchange\": \"BINANCE\",\n      \"ip_address\": \"192.168.1.1\",\n      \"issuing_bank\": \"JP_MORGAN\",\n      \"merchant_id_mpan\": \"m_777\",\n      \"payment_method\": \"VISA\",\n      \"total_transaction_amount\": 150.5,\n      \"user_id\": \"u_123\",\n      \"wallet_address\": \"0xabc123\"\n   }'")
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"events\": [\n         {\n            \"event_timestamp\": \"2024-03-20T10:00:00Z\",\n            \"event_type\": \"PAYMENT\",\n            \"merchant_id_mpan\": \"m_7\",\n            \"total_transaction_amount\": 125,\n            \"user_id\": \"u_1\"\n         },\n         {\n            \"event_timestamp\": 1710930030000,\n            \"event_type\": \"LOGIN\",\n            \"user_id\": \"u_2\"\n         }\n      ]\n   }'")
 		}
-		if body.EventTimestamp == nil {
-			err = goa.MergeErrors(err, goa.MissingFieldError("event_timestamp", "body"))
+		if body.Events == nil {
+			err = goa.MergeErrors(err, goa.MissingFieldError("events", "body"))
+		}
+		if len(body.Events) < 1 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError("body.events", body.Events, len(body.Events), 1, true))
+		}
+		for _, e := range body.Events {
+			if e != nil {
+				if err2 := ValidateCustomerEventRequestBody(e); err2 != nil {
+					err = goa.MergeErrors(err, err2)
+				}
+			}
 		}
 		if err != nil {
 			return nil, err
 		}
 	}
-	v := &ingest.CustomerEvent{
-		UserID:                 body.UserID,
-		MerchantIDMpan:         body.MerchantIDMpan,
-		EventType:              body.EventType,
-		EventTimestamp:         body.EventTimestamp,
-		TotalTransactionAmount: body.TotalTransactionAmount,
-		DeviceID:               body.DeviceID,
-		PaymentMethod:          body.PaymentMethod,
-		IssuingBank:            body.IssuingBank,
-		WalletAddress:          body.WalletAddress,
-		Exchange:               body.Exchange,
-		IPAddress:              body.IPAddress,
+	v := &ingest.BulkCustomerEvents{}
+	if body.Events != nil {
+		v.Events = make([]*ingest.CustomerEvent, len(body.Events))
+		for i, val := range body.Events {
+			if val == nil {
+				v.Events[i] = nil
+				continue
+			}
+			v.Events[i] = marshalCustomerEventRequestBodyToIngestCustomerEvent(val)
+		}
+	} else {
+		v.Events = []*ingest.CustomerEvent{}
 	}
 
 	return v, nil

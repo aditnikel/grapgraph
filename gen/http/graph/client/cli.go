@@ -23,13 +23,10 @@ func BuildPostSubgraphPayload(graphPostSubgraphBody string) (*graph.SubgraphRequ
 	{
 		err = json.Unmarshal([]byte(graphPostSubgraphBody), &body)
 		if err != nil {
-			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"edge_types\": [\n         \"PAYMENT\",\n         \"LOGIN\"\n      ],\n      \"hops\": 2,\n      \"limit\": {\n         \"max_edges\": 100,\n         \"max_nodes\": 50\n      },\n      \"min_event_count\": 2,\n      \"rank_neighbors_by\": \"total_amount\",\n      \"root\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      },\n      \"time_window\": {\n         \"from\": \"2024-01-01T00:00:00Z\",\n         \"to\": \"2024-12-31T23:59:59Z\"\n      }\n   }'")
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"edge_types\": [\n         \"PAYMENT\",\n         \"LOGIN\"\n      ],\n      \"hops\": 2,\n      \"limit\": {\n         \"max_edges\": 100,\n         \"max_nodes\": 50\n      },\n      \"root\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      }\n   }'")
 		}
 		if body.Root == nil {
 			err = goa.MergeErrors(err, goa.MissingFieldError("root", "body"))
-		}
-		if body.TimeWindow == nil {
-			err = goa.MergeErrors(err, goa.MissingFieldError("time_window", "body"))
 		}
 		if body.Limit == nil {
 			err = goa.MergeErrors(err, goa.MissingFieldError("limit", "body"))
@@ -45,9 +42,7 @@ func BuildPostSubgraphPayload(graphPostSubgraphBody string) (*graph.SubgraphRequ
 		}
 	}
 	v := &graph.SubgraphRequest{
-		Hops:            body.Hops,
-		MinEventCount:   body.MinEventCount,
-		RankNeighborsBy: body.RankNeighborsBy,
+		Hops: body.Hops,
 	}
 	if body.Root != nil {
 		v.Root = &struct {
@@ -66,33 +61,10 @@ func BuildPostSubgraphPayload(graphPostSubgraphBody string) (*graph.SubgraphRequ
 			v.Hops = 2
 		}
 	}
-	if body.TimeWindow != nil {
-		v.TimeWindow = &struct {
-			// Start of the window (RFC3339).
-			From string
-			// End of the window (RFC3339).
-			To string
-		}{
-			From: body.TimeWindow.From,
-			To:   body.TimeWindow.To,
-		}
-	}
 	if body.EdgeTypes != nil {
 		v.EdgeTypes = make([]string, len(body.EdgeTypes))
 		for i, val := range body.EdgeTypes {
 			v.EdgeTypes[i] = val
-		}
-	}
-	{
-		var zero int
-		if v.MinEventCount == zero {
-			v.MinEventCount = 1
-		}
-	}
-	{
-		var zero string
-		if v.RankNeighborsBy == zero {
-			v.RankNeighborsBy = "event_count_30d"
 		}
 	}
 	if body.Limit != nil {

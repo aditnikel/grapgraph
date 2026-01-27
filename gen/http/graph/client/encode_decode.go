@@ -188,14 +188,6 @@ func unmarshalGraphEdgeResponseBodyToGraphGraphEdge(v *GraphEdgeResponseBody) *g
 		To:       *v.To,
 		Directed: *v.Directed,
 	}
-	if v.Metrics != nil {
-		res.Metrics = make(map[string]any, len(v.Metrics))
-		for key, val := range v.Metrics {
-			tk := key
-			tv := val
-			res.Metrics[tk] = tv
-		}
-	}
 
 	return res
 }

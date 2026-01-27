@@ -29,11 +29,11 @@ func NewClient(postEvent goa.Endpoint) *Client {
 // PostEvent may return the following errors:
 //   - "bad_request" (type BadRequest)
 //   - error: internal error
-func (c *Client) PostEvent(ctx context.Context, p *CustomerEvent) (res *IngestResponse, err error) {
+func (c *Client) PostEvent(ctx context.Context, p *BulkCustomerEvents) (res *BulkIngestResponse, err error) {
 	var ires any
 	ires, err = c.PostEventEndpoint(ctx, p)
 	if err != nil {
 		return
 	}
-	return ires.(*IngestResponse), nil
+	return ires.(*BulkIngestResponse), nil
 }

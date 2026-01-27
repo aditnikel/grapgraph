@@ -4,17 +4,16 @@ import (
 	"context"
 	"time"
 
-	"github.com/aditnikel/grapgraph/src/ingest"
 	"github.com/aditnikel/grapgraph/src/model"
 )
 
-type repo interface {
-	UpsertAggregated(ctx context.Context, ev model.CustomerEvent, et model.EventType, targetLabel, targetKeyProp, targetKey string, tsMillis int64, amount *float64) error
+type ingester interface {
+	AcceptEvent(ctx context.Context, ev model.CustomerEvent) error
 }
 
 // SeedDemo creates deterministic demo data for FE visualization.
 // Exercises: fanout, shared entities, multiple edge types, and money-bearing aggregates.
-func SeedDemo(ctx context.Context, r repo) error {
+func SeedDemo(ctx context.Context, ingestSvc ingester) error {
 	base := time.Now().Add(-48 * time.Hour).UnixMilli()
 
 	str := func(s string) *string { return &s }
@@ -64,17 +63,7 @@ func SeedDemo(ctx context.Context, r repo) error {
 	}
 
 	for _, ev := range events {
-		et, err := model.ParseEventType(ev.EventType)
-		if err != nil {
-			return err
-		}
-		ts := int64(ev.EventTimestamp.(float64))
-
-		label, prop, key, ok := ingest.ChooseTarget(ev)
-		if !ok {
-			continue
-		}
-		if err := r.UpsertAggregated(ctx, ev, et, label, prop, key, ts, ev.TotalAmount); err != nil {
+		if err := ingestSvc.AcceptEvent(ctx, ev); err != nil {
 			return err
 		}
 	}

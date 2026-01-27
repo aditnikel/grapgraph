@@ -24,19 +24,8 @@ type PostSubgraphRequestBody struct {
 	} `form:"root,omitempty" json:"root,omitempty" xml:"root,omitempty"`
 	// Number of hops to traverse (1-3).
 	Hops *int `form:"hops,omitempty" json:"hops,omitempty" xml:"hops,omitempty"`
-	// Optional time range to filter relationship metrics.
-	TimeWindow *struct {
-		// Start of the window (RFC3339).
-		From *string `form:"from" json:"from" xml:"from"`
-		// End of the window (RFC3339).
-		To *string `form:"to" json:"to" xml:"to"`
-	} `form:"time_window,omitempty" json:"time_window,omitempty" xml:"time_window,omitempty"`
 	// Filter to only include these relationship types.
 	EdgeTypes []string `form:"edge_types,omitempty" json:"edge_types,omitempty" xml:"edge_types,omitempty"`
-	// Minimum number of aggregate events to include an edge.
-	MinEventCount *int `form:"min_event_count,omitempty" json:"min_event_count,omitempty" xml:"min_event_count,omitempty"`
-	// Metric used to sort and truncate neighbor nodes.
-	RankNeighborsBy *string `form:"rank_neighbors_by,omitempty" json:"rank_neighbors_by,omitempty" xml:"rank_neighbors_by,omitempty"`
 	// Resource budget for the response.
 	Limit *struct {
 		// Maximum number of nodes to return.
@@ -53,8 +42,6 @@ type GetMetadataResponseBody struct {
 	NodeTypes []string `form:"node_types" json:"node_types" xml:"node_types"`
 	// All valid event types.
 	EdgeTypes []string `form:"edge_types" json:"edge_types" xml:"edge_types"`
-	// Valid keys for the rank_neighbors_by parameter.
-	RankMetrics []string `form:"rank_metrics" json:"rank_metrics" xml:"rank_metrics"`
 }
 
 // PostSubgraphResponseBody is the type of the "graph" service "post_subgraph"
@@ -98,8 +85,6 @@ type GraphEdgeResponseBody struct {
 	To string `form:"to" json:"to" xml:"to"`
 	// Whether the relationship has a specific flow direction.
 	Directed bool `form:"directed" json:"directed" xml:"directed"`
-	// Statistical snapshots (count, amount, first_seen, etc).
-	Metrics map[string]any `form:"metrics,omitempty" json:"metrics,omitempty" xml:"metrics,omitempty"`
 }
 
 // NewGetMetadataResponseBody builds the HTTP response body from the result of
@@ -121,14 +106,6 @@ func NewGetMetadataResponseBody(res *graph.MetadataResponse) *GetMetadataRespons
 		}
 	} else {
 		body.EdgeTypes = []string{}
-	}
-	if res.RankMetrics != nil {
-		body.RankMetrics = make([]string, len(res.RankMetrics))
-		for i, val := range res.RankMetrics {
-			body.RankMetrics[i] = val
-		}
-	} else {
-		body.RankMetrics = []string{}
 	}
 	return body
 }
@@ -175,12 +152,6 @@ func NewPostSubgraphSubgraphRequest(body *PostSubgraphRequestBody) *graph.Subgra
 	if body.Hops != nil {
 		v.Hops = *body.Hops
 	}
-	if body.MinEventCount != nil {
-		v.MinEventCount = *body.MinEventCount
-	}
-	if body.RankNeighborsBy != nil {
-		v.RankNeighborsBy = *body.RankNeighborsBy
-	}
 	v.Root = &struct {
 		// Type of the root node (usually USER).
 		Type string
@@ -193,26 +164,11 @@ func NewPostSubgraphSubgraphRequest(body *PostSubgraphRequestBody) *graph.Subgra
 	if body.Hops == nil {
 		v.Hops = 2
 	}
-	v.TimeWindow = &struct {
-		// Start of the window (RFC3339).
-		From string
-		// End of the window (RFC3339).
-		To string
-	}{
-		From: *body.TimeWindow.From,
-		To:   *body.TimeWindow.To,
-	}
 	if body.EdgeTypes != nil {
 		v.EdgeTypes = make([]string, len(body.EdgeTypes))
 		for i, val := range body.EdgeTypes {
 			v.EdgeTypes[i] = val
 		}
-	}
-	if body.MinEventCount == nil {
-		v.MinEventCount = 1
-	}
-	if body.RankNeighborsBy == nil {
-		v.RankNeighborsBy = "event_count_30d"
 	}
 	v.Limit = &struct {
 		// Maximum number of nodes to return.
@@ -233,9 +189,6 @@ func ValidatePostSubgraphRequestBody(body *PostSubgraphRequestBody) (err error) 
 	if body.Root == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("root", "body"))
 	}
-	if body.TimeWindow == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("time_window", "body"))
-	}
 	if body.Limit == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("limit", "body"))
 	}
@@ -255,14 +208,6 @@ func ValidatePostSubgraphRequestBody(body *PostSubgraphRequestBody) (err error) 
 	if body.Hops != nil {
 		if *body.Hops > 3 {
 			err = goa.MergeErrors(err, goa.InvalidRangeError("body.hops", *body.Hops, 3, false))
-		}
-	}
-	if body.TimeWindow != nil {
-		if body.TimeWindow.From == nil {
-			err = goa.MergeErrors(err, goa.MissingFieldError("from", "body.time_window"))
-		}
-		if body.TimeWindow.To == nil {
-			err = goa.MergeErrors(err, goa.MissingFieldError("to", "body.time_window"))
 		}
 	}
 	if body.Limit != nil {

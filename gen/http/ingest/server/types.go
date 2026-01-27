@@ -15,6 +15,23 @@ import (
 // PostEventRequestBody is the type of the "ingest" service "post_event"
 // endpoint HTTP request body.
 type PostEventRequestBody struct {
+	// List of events to ingest in-order.
+	Events []*CustomerEventRequestBody `form:"events,omitempty" json:"events,omitempty" xml:"events,omitempty"`
+}
+
+// PostEventResponseBody is the type of the "ingest" service "post_event"
+// endpoint HTTP response body.
+type PostEventResponseBody struct {
+	// Whether all events were processed successfully.
+	Accepted bool `form:"accepted" json:"accepted" xml:"accepted"`
+	// Number of events accepted in this batch.
+	AcceptedCount int `form:"accepted_count" json:"accepted_count" xml:"accepted_count"`
+	// Number of events rejected in this batch.
+	FailedCount int `form:"failed_count" json:"failed_count" xml:"failed_count"`
+}
+
+// CustomerEventRequestBody is used to define fields on request body types.
+type CustomerEventRequestBody struct {
 	// Unique identifier of the user (e.g. u_123).
 	UserID *string `form:"user_id,omitempty" json:"user_id,omitempty" xml:"user_id,omitempty"`
 	// Target merchant ID or card MPAN.
@@ -39,37 +56,28 @@ type PostEventRequestBody struct {
 	IPAddress *string `form:"ip_address,omitempty" json:"ip_address,omitempty" xml:"ip_address,omitempty"`
 }
 
-// PostEventResponseBody is the type of the "ingest" service "post_event"
-// endpoint HTTP response body.
-type PostEventResponseBody struct {
-	// Whether the event was successfully queued or processed.
-	Accepted bool `form:"accepted" json:"accepted" xml:"accepted"`
-}
-
 // NewPostEventResponseBody builds the HTTP response body from the result of
 // the "post_event" endpoint of the "ingest" service.
-func NewPostEventResponseBody(res *ingest.IngestResponse) *PostEventResponseBody {
+func NewPostEventResponseBody(res *ingest.BulkIngestResponse) *PostEventResponseBody {
 	body := &PostEventResponseBody{
-		Accepted: res.Accepted,
+		Accepted:      res.Accepted,
+		AcceptedCount: res.AcceptedCount,
+		FailedCount:   res.FailedCount,
 	}
 	return body
 }
 
-// NewPostEventCustomerEvent builds a ingest service post_event endpoint
+// NewPostEventBulkCustomerEvents builds a ingest service post_event endpoint
 // payload.
-func NewPostEventCustomerEvent(body *PostEventRequestBody) *ingest.CustomerEvent {
-	v := &ingest.CustomerEvent{
-		UserID:                 *body.UserID,
-		MerchantIDMpan:         body.MerchantIDMpan,
-		EventType:              *body.EventType,
-		EventTimestamp:         body.EventTimestamp,
-		TotalTransactionAmount: body.TotalTransactionAmount,
-		DeviceID:               body.DeviceID,
-		PaymentMethod:          body.PaymentMethod,
-		IssuingBank:            body.IssuingBank,
-		WalletAddress:          body.WalletAddress,
-		Exchange:               body.Exchange,
-		IPAddress:              body.IPAddress,
+func NewPostEventBulkCustomerEvents(body *PostEventRequestBody) *ingest.BulkCustomerEvents {
+	v := &ingest.BulkCustomerEvents{}
+	v.Events = make([]*ingest.CustomerEvent, len(body.Events))
+	for i, val := range body.Events {
+		if val == nil {
+			v.Events[i] = nil
+			continue
+		}
+		v.Events[i] = unmarshalCustomerEventRequestBodyToIngestCustomerEvent(val)
 	}
 
 	return v
@@ -78,6 +86,25 @@ func NewPostEventCustomerEvent(body *PostEventRequestBody) *ingest.CustomerEvent
 // ValidatePostEventRequestBody runs the validations defined on
 // post_event_request_body
 func ValidatePostEventRequestBody(body *PostEventRequestBody) (err error) {
+	if body.Events == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("events", "body"))
+	}
+	if len(body.Events) < 1 {
+		err = goa.MergeErrors(err, goa.InvalidLengthError("body.events", body.Events, len(body.Events), 1, true))
+	}
+	for _, e := range body.Events {
+		if e != nil {
+			if err2 := ValidateCustomerEventRequestBody(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return
+}
+
+// ValidateCustomerEventRequestBody runs the validations defined on
+// CustomerEventRequestBody
+func ValidateCustomerEventRequestBody(body *CustomerEventRequestBody) (err error) {
 	if body.UserID == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("user_id", "body"))
 	}

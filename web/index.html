@@ -195,30 +195,6 @@
       </select>
     </div>
 
-    <div style="display:flex; flex-direction:column; gap:2px;">
-      <label>Metric</label>
-      <select id="rank">
-        <option value="event_count_30d" selected>30d Count</option>
-        <option value="event_count">Total Count</option>
-        <option value="total_amount">Total Amount</option>
-      </select>
-    </div>
-
-    <div style="display:flex; flex-direction:column; gap:2px;">
-      <label>Min Count</label>
-      <input id="minCount" type="number" value="1" min="1" style="width: 70px;" />
-    </div>
-
-    <div style="display:flex; flex-direction:column; gap:2px;">
-      <label>From</label>
-      <input id="from" type="datetime-local" />
-    </div>
-
-    <div style="display:flex; flex-direction:column; gap:2px;">
-      <label>To</label>
-      <input id="to" type="datetime-local" />
-    </div>
-
     <button id="loadBtn">Visualize</button>
 
     <div style="display:flex; gap:8px; margin-left: auto;">
@@ -296,15 +272,6 @@
       if (type === "error") div.style.borderLeftColor = "#ef4444";
       container.appendChild(div);
       setTimeout(() => div.remove(), 4000);
-    }
-
-    function setDefaultTimeInputs() {
-      const now = new Date();
-      const from = new Date(now.getTime() - 365*24*60*60*1000);
-      const pad = (n) => String(n).padStart(2, "0");
-      const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      $("from").value = fmt(from);
-      $("to").value = fmt(now);
     }
 
     const edgeColorScale = d3.scaleOrdinal(d3.schemeTableau10);
@@ -433,7 +400,7 @@
         .attr("stroke-width", 2)
         .attr("stroke-opacity", 0.4)
         .attr("marker-end", "url(#end)")
-        .on("mouseenter", (e, d) => showTip(e, `<b>${d.type}</b><br>${metricFmt(d.metrics)}`))
+        .on("mouseenter", (e, d) => showTip(e, `<b>${d.type}</b>`))
         .on("mouseleave", hideTip);
 
       nodeSel = g.append("g")
@@ -481,11 +448,6 @@
       });
     }
 
-    function metricFmt(m) {
-      if (!m) return "No metrics";
-      return Object.entries(m).map(([k, v]) => `• ${k.replace(/_/g, " ")}: <b>${typeof v === 'number' ? v.toLocaleString() : v}</b>`).join("<br>");
-    }
-
     function showTip(e, html) {
       const tip = $("tip");
       tip.innerHTML = html;
@@ -520,12 +482,6 @@
         const body = {
           root: { type: "USER", key: userId },
           hops: parseInt($("hops").value),
-          rank_neighbors_by: $("rank").value,
-          min_event_count: parseInt($("minCount").value),
-          time_window: {
-            from: new Date($("from").value).toISOString(),
-            to: new Date($("to").value).toISOString()
-          },
           limit: { max_nodes: 100, max_edges: 200 }
         };
 
@@ -560,9 +516,6 @@
         const body = {
           root: { type: "USER", key: key },
           hops: 1,
-          rank_neighbors_by: $("rank").value,
-          min_event_count: 1,
-          time_window: { from: new Date($("from").value).toISOString(), to: new Date($("to").value).toISOString() },
           limit: { max_nodes: 50, max_edges: 100 }
         };
         const res = await fetch(`${API_BASE}/v1/graph/subgraph`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -589,7 +542,6 @@
     $("clusterByType").onchange = refreshGraph;
 
     // --- Boot ---
-    setDefaultTimeInputs();
     initMetadata();
   </script>
 </body>

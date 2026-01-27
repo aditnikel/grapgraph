@@ -63,10 +63,10 @@ var _ = Service("ingest", func() {
 	Description("High-speed financial event ingestion service.")
 	Error("bad_request", String, "Error returned when the request payload is malformed or invalid.")
 
-	Method("post_event", func() {
-		Description("Accepts a new financial event (Payment, Login, etc.) and updates the relationship graph.")
-		Payload(CustomerEvent)
-		Result(IngestResponse)
+Method("post_event", func() {
+		Description("Accepts one or more financial events (Payment, Login, etc.) and updates the relationship graph.")
+		Payload(BulkCustomerEvents)
+		Result(BulkIngestResponse)
 		HTTP(func() {
 			POST("/v1/ingest/event")
 			Response(StatusAccepted)
@@ -108,6 +108,14 @@ var HealthResponse = Type("HealthResponse", func() {
 	Required("ok")
 })
 
+var BulkIngestResponse = Type("BulkIngestResponse", func() {
+	Description("Result of the bulk ingestion attempt.")
+	Attribute("accepted", Boolean, "Whether all events were processed successfully.", func() { Example(true) })
+	Attribute("accepted_count", Int, "Number of events accepted in this batch.", func() { Example(3) })
+	Attribute("failed_count", Int, "Number of events rejected in this batch.", func() { Example(0) })
+	Required("accepted", "accepted_count", "failed_count")
+})
+// Deprecated: IngestResponse is replaced by BulkIngestResponse now that post_event supports batches.
 var IngestResponse = Type("IngestResponse", func() {
 	Description("Result of the event ingestion attempt.")
 	Attribute("accepted", Boolean, "Whether the event was successfully queued or processed.", func() { Example(true) })
@@ -130,6 +138,18 @@ var CustomerEvent = Type("CustomerEvent", func() {
 	Required("user_id", "event_type", "event_timestamp")
 })
 
+var BulkCustomerEvents = Type("BulkCustomerEvents", func() {
+	Description("Batch of financial events for ingestion.")
+	Attribute("events", ArrayOf(CustomerEvent), "List of events to ingest in-order.", func() {
+		MinLength(1)
+		Example([]any{
+			map[string]any{"user_id": "u_1", "event_type": "PAYMENT", "event_timestamp": "2024-03-20T10:00:00Z", "total_transaction_amount": 125.0, "merchant_id_mpan": "m_7"},
+			map[string]any{"user_id": "u_2", "event_type": "LOGIN", "event_timestamp": 1710930030000},
+		})
+	})
+	Required("events")
+})
+
 var SubgraphRequest = Type("SubgraphRequest", func() {
 	Description("Parameters for extracting a localized network subgraph.")
 	Attribute("root", func() {
@@ -139,22 +159,14 @@ var SubgraphRequest = Type("SubgraphRequest", func() {
 		Required("type", "key")
 	})
 	Attribute("hops", Int, "Number of hops to traverse (1-3).", func() { Default(2); Minimum(1); Maximum(3); Example(2) })
-	Attribute("time_window", func() {
-		Description("Optional time range to filter relationship metrics.")
-		Attribute("from", String, "Start of the window (RFC3339).", func() { Example("2024-01-01T00:00:00Z") })
-		Attribute("to", String, "End of the window (RFC3339).", func() { Example("2024-12-31T23:59:59Z") })
-		Required("from", "to")
-	})
 	Attribute("edge_types", ArrayOf(String), "Filter to only include these relationship types.", func() { Example([]string{"PAYMENT", "LOGIN"}) })
-	Attribute("min_event_count", Int, "Minimum number of aggregate events to include an edge.", func() { Default(1); Example(2) })
-	Attribute("rank_neighbors_by", String, "Metric used to sort and truncate neighbor nodes.", func() { Default("event_count_30d"); Example("total_amount") })
 	Attribute("limit", func() {
 		Description("Resource budget for the response.")
 		Attribute("max_nodes", Int, "Maximum number of nodes to return.", func() { Default(100); Example(50) })
 		Attribute("max_edges", Int, "Maximum number of edges to return.", func() { Default(200); Example(100) })
 		Required("max_nodes", "max_edges")
 	})
-	Required("root", "time_window", "limit")
+	Required("root", "limit")
 })
 
 var GraphNode = Type("GraphNode", func() {
@@ -168,13 +180,12 @@ var GraphNode = Type("GraphNode", func() {
 })
 
 var GraphEdge = Type("GraphEdge", func() {
-	Description("A relationship between two entities with aggregated metrics.")
+	Description("A relationship between two entities.")
 	Attribute("id", String, "Unique ID for the specific relationship.", func() { Example("e123") })
 	Attribute("type", String, "The type of connection (e.g. PAYMENT).", func() { Example("PAYMENT") })
 	Attribute("from", String, "ID of the source node.", func() { Example("USER:u_123") })
 	Attribute("to", String, "ID of the target node.", func() { Example("MERCHANT:m_777") })
 	Attribute("directed", Boolean, "Whether the relationship has a specific flow direction.", func() { Example(true) })
-	Attribute("metrics", MapOf(String, Any), "Statistical snapshots (count, amount, first_seen, etc).")
 	Required("id", "type", "from", "to", "directed")
 })
 
@@ -192,6 +203,5 @@ var MetadataResponse = Type("MetadataResponse", func() {
 	Description("Supported constants and schema definitions for the current system.")
 	Attribute("node_types", ArrayOf(String), "All valid entity types.", func() { Example([]string{"USER", "MERCHANT", "DEVICE"}) })
 	Attribute("edge_types", ArrayOf(String), "All valid event types.", func() { Example([]string{"PAYMENT", "LOGIN", "WITHDRAWAL"}) })
-	Attribute("rank_metrics", ArrayOf(String), "Valid keys for the rank_neighbors_by parameter.", func() { Example([]string{"event_count", "total_amount"}) })
-	Required("node_types", "edge_types", "rank_metrics")
+	Required("node_types", "edge_types")
 })

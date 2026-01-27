@@ -24,19 +24,8 @@ type PostSubgraphRequestBody struct {
 	} `form:"root" json:"root" xml:"root"`
 	// Number of hops to traverse (1-3).
 	Hops int `form:"hops" json:"hops" xml:"hops"`
-	// Optional time range to filter relationship metrics.
-	TimeWindow *struct {
-		// Start of the window (RFC3339).
-		From string `form:"from" json:"from" xml:"from"`
-		// End of the window (RFC3339).
-		To string `form:"to" json:"to" xml:"to"`
-	} `form:"time_window" json:"time_window" xml:"time_window"`
 	// Filter to only include these relationship types.
 	EdgeTypes []string `form:"edge_types,omitempty" json:"edge_types,omitempty" xml:"edge_types,omitempty"`
-	// Minimum number of aggregate events to include an edge.
-	MinEventCount int `form:"min_event_count" json:"min_event_count" xml:"min_event_count"`
-	// Metric used to sort and truncate neighbor nodes.
-	RankNeighborsBy string `form:"rank_neighbors_by" json:"rank_neighbors_by" xml:"rank_neighbors_by"`
 	// Resource budget for the response.
 	Limit *struct {
 		// Maximum number of nodes to return.
@@ -53,8 +42,6 @@ type GetMetadataResponseBody struct {
 	NodeTypes []string `form:"node_types,omitempty" json:"node_types,omitempty" xml:"node_types,omitempty"`
 	// All valid event types.
 	EdgeTypes []string `form:"edge_types,omitempty" json:"edge_types,omitempty" xml:"edge_types,omitempty"`
-	// Valid keys for the rank_neighbors_by parameter.
-	RankMetrics []string `form:"rank_metrics,omitempty" json:"rank_metrics,omitempty" xml:"rank_metrics,omitempty"`
 }
 
 // PostSubgraphResponseBody is the type of the "graph" service "post_subgraph"
@@ -98,17 +85,13 @@ type GraphEdgeResponseBody struct {
 	To *string `form:"to,omitempty" json:"to,omitempty" xml:"to,omitempty"`
 	// Whether the relationship has a specific flow direction.
 	Directed *bool `form:"directed,omitempty" json:"directed,omitempty" xml:"directed,omitempty"`
-	// Statistical snapshots (count, amount, first_seen, etc).
-	Metrics map[string]any `form:"metrics,omitempty" json:"metrics,omitempty" xml:"metrics,omitempty"`
 }
 
 // NewPostSubgraphRequestBody builds the HTTP request body from the payload of
 // the "post_subgraph" endpoint of the "graph" service.
 func NewPostSubgraphRequestBody(p *graph.SubgraphRequest) *PostSubgraphRequestBody {
 	body := &PostSubgraphRequestBody{
-		Hops:            p.Hops,
-		MinEventCount:   p.MinEventCount,
-		RankNeighborsBy: p.RankNeighborsBy,
+		Hops: p.Hops,
 	}
 	if p.Root != nil {
 		body.Root = &struct {
@@ -127,33 +110,10 @@ func NewPostSubgraphRequestBody(p *graph.SubgraphRequest) *PostSubgraphRequestBo
 			body.Hops = 2
 		}
 	}
-	if p.TimeWindow != nil {
-		body.TimeWindow = &struct {
-			// Start of the window (RFC3339).
-			From string `form:"from" json:"from" xml:"from"`
-			// End of the window (RFC3339).
-			To string `form:"to" json:"to" xml:"to"`
-		}{
-			From: p.TimeWindow.From,
-			To:   p.TimeWindow.To,
-		}
-	}
 	if p.EdgeTypes != nil {
 		body.EdgeTypes = make([]string, len(p.EdgeTypes))
 		for i, val := range p.EdgeTypes {
 			body.EdgeTypes[i] = val
-		}
-	}
-	{
-		var zero int
-		if body.MinEventCount == zero {
-			body.MinEventCount = 1
-		}
-	}
-	{
-		var zero string
-		if body.RankNeighborsBy == zero {
-			body.RankNeighborsBy = "event_count_30d"
 		}
 	}
 	if p.Limit != nil {
@@ -181,10 +141,6 @@ func NewGetMetadataMetadataResponseOK(body *GetMetadataResponseBody) *graph.Meta
 	v.EdgeTypes = make([]string, len(body.EdgeTypes))
 	for i, val := range body.EdgeTypes {
 		v.EdgeTypes[i] = val
-	}
-	v.RankMetrics = make([]string, len(body.RankMetrics))
-	for i, val := range body.RankMetrics {
-		v.RankMetrics[i] = val
 	}
 
 	return v
@@ -234,9 +190,6 @@ func ValidateGetMetadataResponseBody(body *GetMetadataResponseBody) (err error) 
 	}
 	if body.EdgeTypes == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("edge_types", "body"))
-	}
-	if body.RankMetrics == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("rank_metrics", "body"))
 	}
 	return
 }

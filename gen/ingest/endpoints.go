@@ -34,7 +34,7 @@ func (e *Endpoints) Use(m func(goa.Endpoint) goa.Endpoint) {
 // "post_event" of service "ingest".
 func NewPostEventEndpoint(s Service) goa.Endpoint {
 	return func(ctx context.Context, req any) (any, error) {
-		p := req.(*CustomerEvent)
+		p := req.(*BulkCustomerEvents)
 		return s.PostEvent(ctx, p)
 	}
 }

@@ -29,27 +29,17 @@ func (s *GraphService) GetMetadata(ctx context.Context) (*graph.MetadataResponse
 			string(model.NodeDevice),
 		},
 		EdgeTypes: ets,
-		RankMetrics: []string{
-			"event_count_30d",
-			"event_count",
-			"total_amount",
-		},
 	}, nil
 }
 
 func (s *GraphService) PostSubgraph(ctx context.Context, p *graph.SubgraphRequest) (*graph.SubgraphResponse, error) {
 	req := model.SubgraphRequest{
-		Hops:            p.Hops,
-		EdgeTypes:       p.EdgeTypes,
-		MinEventCount:   p.MinEventCount,
-		RankNeighborsBy: p.RankNeighborsBy,
+		Hops:      p.Hops,
+		EdgeTypes: p.EdgeTypes,
 	}
 
 	req.Root.Type = p.Root.Type
 	req.Root.Key = p.Root.Key
-
-	req.TimeWindow.From = p.TimeWindow.From
-	req.TimeWindow.To = p.TimeWindow.To
 
 	req.Limit.MaxNodes = p.Limit.MaxNodes
 	req.Limit.MaxEdges = p.Limit.MaxEdges
@@ -78,7 +68,6 @@ func (s *GraphService) PostSubgraph(ctx context.Context, p *graph.SubgraphReques
 			From:     e.From,
 			To:       e.To,
 			Directed: e.Directed,
-			Metrics:  e.Metrics,
 		}
 	}
 

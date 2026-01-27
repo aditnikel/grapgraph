@@ -20,8 +20,8 @@ paths:
                         application/json:
                             schema:
                                 type: string
-                                example: Dolores sit in.
-                            example: Commodi possimus possimus fugit doloribus doloremque quisquam.
+                                example: Ea ut nulla voluptate inventore.
+                            example: Nihil consequuntur laudantium.
     /docs:
         get:
             tags:
@@ -36,8 +36,8 @@ paths:
                         text/html:
                             schema:
                                 type: string
-                                example: Quidem at tempora perspiciatis et.
-                            example: Et suscipit maiores adipisci.
+                                example: Error alias.
+                            example: Velit odit voluptas ab modi tempore.
     /healthz:
         get:
             tags:
@@ -96,9 +96,6 @@ paths:
                                     - USER
                                     - MERCHANT
                                     - DEVICE
-                                rank_metrics:
-                                    - event_count
-                                    - total_amount
     /v1/graph/subgraph:
         post:
             tags:
@@ -120,14 +117,9 @@ paths:
                             limit:
                                 max_edges: 100
                                 max_nodes: 50
-                            min_event_count: 2
-                            rank_neighbors_by: total_amount
                             root:
                                 key: u_123
                                 type: USER
-                            time_window:
-                                from: "2024-01-01T00:00:00Z"
-                                to: "2024-12-31T23:59:59Z"
             responses:
                 "200":
                     description: OK response.
@@ -140,22 +132,11 @@ paths:
                                     - directed: true
                                       from: USER:u_123
                                       id: e123
-                                      metrics:
-                                        Accusantium repellat dolores quae.: Ratione dolor natus dolor maiores magnam.
                                       to: MERCHANT:m_777
                                       type: PAYMENT
                                     - directed: true
                                       from: USER:u_123
                                       id: e123
-                                      metrics:
-                                        Accusantium repellat dolores quae.: Ratione dolor natus dolor maiores magnam.
-                                      to: MERCHANT:m_777
-                                      type: PAYMENT
-                                    - directed: true
-                                      from: USER:u_123
-                                      id: e123
-                                      metrics:
-                                        Accusantium repellat dolores quae.: Ratione dolor natus dolor maiores magnam.
                                       to: MERCHANT:m_777
                                       type: PAYMENT
                                 nodes:
@@ -163,33 +144,15 @@ paths:
                                       key: u_123
                                       label: User u_123
                                       props:
-                                        Eius quis est assumenda excepturi quod.: Exercitationem tempore aspernatur.
-                                        Et et natus minus ea eligendi.: Non veniam vel rerum sed placeat natus.
-                                        Vel reprehenderit facere.: Esse doloremque occaecati enim est unde qui.
+                                        Aut pariatur incidunt assumenda maxime perferendis.: Tempore perferendis dolores voluptatibus rem.
+                                        Expedita pariatur quia labore sapiente.: Odio laudantium ut et nulla rerum maxime.
                                       type: USER
                                     - id: USER:u_123
                                       key: u_123
                                       label: User u_123
                                       props:
-                                        Eius quis est assumenda excepturi quod.: Exercitationem tempore aspernatur.
-                                        Et et natus minus ea eligendi.: Non veniam vel rerum sed placeat natus.
-                                        Vel reprehenderit facere.: Esse doloremque occaecati enim est unde qui.
-                                      type: USER
-                                    - id: USER:u_123
-                                      key: u_123
-                                      label: User u_123
-                                      props:
-                                        Eius quis est assumenda excepturi quod.: Exercitationem tempore aspernatur.
-                                        Et et natus minus ea eligendi.: Non veniam vel rerum sed placeat natus.
-                                        Vel reprehenderit facere.: Esse doloremque occaecati enim est unde qui.
-                                      type: USER
-                                    - id: USER:u_123
-                                      key: u_123
-                                      label: User u_123
-                                      props:
-                                        Eius quis est assumenda excepturi quod.: Exercitationem tempore aspernatur.
-                                        Et et natus minus ea eligendi.: Non veniam vel rerum sed placeat natus.
-                                        Vel reprehenderit facere.: Esse doloremque occaecati enim est unde qui.
+                                        Aut pariatur incidunt assumenda maxime perferendis.: Tempore perferendis dolores voluptatibus rem.
+                                        Expedita pariatur quia labore sapiente.: Odio laudantium ut et nulla rerum maxime.
                                       type: USER
                                 root: USER:u_123
                                 truncated: false
@@ -200,52 +163,109 @@ paths:
                         application/json:
                             schema:
                                 type: string
-                                example: Molestiae quisquam excepturi ut debitis.
-                            example: Doloribus ad ut repellat.
+                                example: Et est et placeat harum omnis.
+                            example: Maiores amet soluta repellat.
     /v1/ingest/event:
         post:
             tags:
                 - ingest
             summary: post_event ingest
-            description: Accepts a new financial event (Payment, Login, etc.) and updates the relationship graph.
+            description: Accepts one or more financial events (Payment, Login, etc.) and updates the relationship graph.
             operationId: ingest#post_event
             requestBody:
                 required: true
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/CustomerEvent'
+                            $ref: '#/components/schemas/BulkCustomerEvents'
                         example:
-                            device_id: d_888
-                            event_timestamp: "2024-03-20T10:00:00Z"
-                            event_type: PAYMENT
-                            exchange: BINANCE
-                            ip_address: 192.168.1.1
-                            issuing_bank: JP_MORGAN
-                            merchant_id_mpan: m_777
-                            payment_method: VISA
-                            total_transaction_amount: 150.5
-                            user_id: u_123
-                            wallet_address: "0xabc123"
+                            events:
+                                - event_timestamp: "2024-03-20T10:00:00Z"
+                                  event_type: PAYMENT
+                                  merchant_id_mpan: m_7
+                                  total_transaction_amount: 125
+                                  user_id: u_1
+                                - event_timestamp: 1710930030000
+                                  event_type: LOGIN
+                                  user_id: u_2
             responses:
                 "202":
                     description: Accepted response.
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/IngestResponse'
+                                $ref: '#/components/schemas/BulkIngestResponse'
                             example:
                                 accepted: true
+                                accepted_count: 3
+                                failed_count: 0
                 "400":
                     description: 'bad_request: Bad Request response.'
                     content:
                         application/json:
                             schema:
                                 type: string
-                                example: Earum voluptates ut.
-                            example: Debitis ea amet qui.
+                                example: Ipsa laboriosam error hic autem placeat itaque.
+                            example: Sit quod numquam dolores earum quis.
 components:
     schemas:
+        BulkCustomerEvents:
+            type: object
+            properties:
+                events:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/CustomerEvent'
+                    description: List of events to ingest in-order.
+                    example:
+                        - event_timestamp: "2024-03-20T10:00:00Z"
+                          event_type: PAYMENT
+                          merchant_id_mpan: m_7
+                          total_transaction_amount: 125
+                          user_id: u_1
+                        - event_timestamp: 1710930030000
+                          event_type: LOGIN
+                          user_id: u_2
+                    minItems: 1
+            description: Batch of financial events for ingestion.
+            example:
+                events:
+                    - event_timestamp: "2024-03-20T10:00:00Z"
+                      event_type: PAYMENT
+                      merchant_id_mpan: m_7
+                      total_transaction_amount: 125
+                      user_id: u_1
+                    - event_timestamp: 1710930030000
+                      event_type: LOGIN
+                      user_id: u_2
+            required:
+                - events
+        BulkIngestResponse:
+            type: object
+            properties:
+                accepted:
+                    type: boolean
+                    description: Whether all events were processed successfully.
+                    example: true
+                accepted_count:
+                    type: integer
+                    description: Number of events accepted in this batch.
+                    example: 3
+                    format: int64
+                failed_count:
+                    type: integer
+                    description: Number of events rejected in this batch.
+                    example: 0
+                    format: int64
+            description: Result of the bulk ingestion attempt.
+            example:
+                accepted: true
+                accepted_count: 3
+                failed_count: 0
+            required:
+                - accepted
+                - accepted_count
+                - failed_count
         CustomerEvent:
             type: object
             properties:
@@ -325,12 +345,6 @@ components:
                     type: string
                     description: Unique ID for the specific relationship.
                     example: e123
-                metrics:
-                    type: object
-                    description: Statistical snapshots (count, amount, first_seen, etc).
-                    example:
-                        Molestias labore delectus reprehenderit fuga laborum non.: Similique consequatur quos adipisci aut.
-                    additionalProperties: true
                 to:
                     type: string
                     description: ID of the target node.
@@ -339,13 +353,11 @@ components:
                     type: string
                     description: The type of connection (e.g. PAYMENT).
                     example: PAYMENT
-            description: A relationship between two entities with aggregated metrics.
+            description: A relationship between two entities.
             example:
                 directed: true
                 from: USER:u_123
                 id: e123
-                metrics:
-                    Et qui sed odio aliquam sapiente.: Dignissimos alias.
                 to: MERCHANT:m_777
                 type: PAYMENT
             required:
@@ -373,9 +385,9 @@ components:
                     type: object
                     description: Additional key-value properties.
                     example:
-                        Error alias.: Ipsa laboriosam error hic autem placeat itaque.
-                        Et est et placeat harum omnis.: Nihil consequuntur laudantium.
-                        Velit odit voluptas ab modi tempore.: Sit quod numquam dolores earum quis.
+                        Et hic veniam aut.: Possimus consequatur velit ea.
+                        Odit rerum.: Saepe enim aliquid accusamus accusantium.
+                        Quis nam eum dolorum iure nobis.: Doloremque quia quaerat sed eum consequuntur dicta.
                     additionalProperties: true
                 type:
                     type: string
@@ -387,9 +399,9 @@ components:
                 key: u_123
                 label: User u_123
                 props:
-                    Amet soluta repellat debitis.: Laboriosam placeat saepe labore voluptatibus.
-                    Consequuntur natus nihil est.: Voluptatem ipsa veritatis ad voluptatem eum.
-                    Corrupti error itaque illum dolorem.: Repellat ea.
+                    Id sunt rem.: Asperiores deserunt iusto.
+                    Nemo vel odio qui.: Et quo consectetur.
+                    Provident facere sapiente.: Qui natus ut autem possimus.
                 type: USER
             required:
                 - id
@@ -432,7 +444,7 @@ components:
                     type: array
                     items:
                         type: string
-                        example: Non illum nobis aut.
+                        example: Quia vel et porro incidunt.
                     description: All valid event types.
                     example:
                         - PAYMENT
@@ -442,21 +454,12 @@ components:
                     type: array
                     items:
                         type: string
-                        example: Nam voluptas molestiae atque perspiciatis.
+                        example: Minima est aut.
                     description: All valid entity types.
                     example:
                         - USER
                         - MERCHANT
                         - DEVICE
-                rank_metrics:
-                    type: array
-                    items:
-                        type: string
-                        example: Dolor exercitationem cumque explicabo.
-                    description: Valid keys for the rank_neighbors_by parameter.
-                    example:
-                        - event_count
-                        - total_amount
             description: Supported constants and schema definitions for the current system.
             example:
                 edge_types:
@@ -467,13 +470,9 @@ components:
                     - USER
                     - MERCHANT
                     - DEVICE
-                rank_metrics:
-                    - event_count
-                    - total_amount
             required:
                 - node_types
                 - edge_types
-                - rank_metrics
         SubgraphRequest:
             type: object
             properties:
@@ -481,7 +480,7 @@ components:
                     type: array
                     items:
                         type: string
-                        example: Deserunt ea ut nulla voluptate.
+                        example: Ab iusto quasi doloremque et atque sit.
                     description: Filter to only include these relationship types.
                     example:
                         - PAYMENT
@@ -516,17 +515,6 @@ components:
                     required:
                         - max_nodes
                         - max_edges
-                min_event_count:
-                    type: integer
-                    description: Minimum number of aggregate events to include an edge.
-                    default: 1
-                    example: 2
-                    format: int64
-                rank_neighbors_by:
-                    type: string
-                    description: Metric used to sort and truncate neighbor nodes.
-                    default: event_count_30d
-                    example: total_amount
                 root:
                     type: object
                     properties:
@@ -545,24 +533,6 @@ components:
                     required:
                         - type
                         - key
-                time_window:
-                    type: object
-                    properties:
-                        from:
-                            type: string
-                            description: Start of the window (RFC3339).
-                            example: "2024-01-01T00:00:00Z"
-                        to:
-                            type: string
-                            description: End of the window (RFC3339).
-                            example: "2024-12-31T23:59:59Z"
-                    description: Optional time range to filter relationship metrics.
-                    example:
-                        from: "2024-01-01T00:00:00Z"
-                        to: "2024-12-31T23:59:59Z"
-                    required:
-                        - from
-                        - to
             description: Parameters for extracting a localized network subgraph.
             example:
                 edge_types:
@@ -572,17 +542,11 @@ components:
                 limit:
                     max_edges: 100
                     max_nodes: 50
-                min_event_count: 2
-                rank_neighbors_by: total_amount
                 root:
                     key: u_123
                     type: USER
-                time_window:
-                    from: "2024-01-01T00:00:00Z"
-                    to: "2024-12-31T23:59:59Z"
             required:
                 - root
-                - time_window
                 - limit
         SubgraphResponse:
             type: object
@@ -596,28 +560,11 @@ components:
                         - directed: true
                           from: USER:u_123
                           id: e123
-                          metrics:
-                            Et sunt.: Sit est eligendi soluta accusamus non omnis.
-                            Maxime cupiditate dolores fugit natus quia.: Quia voluptatem.
-                            Quia labore numquam explicabo id eos.: Explicabo totam dicta totam facilis est qui.
                           to: MERCHANT:m_777
                           type: PAYMENT
                         - directed: true
                           from: USER:u_123
                           id: e123
-                          metrics:
-                            Et sunt.: Sit est eligendi soluta accusamus non omnis.
-                            Maxime cupiditate dolores fugit natus quia.: Quia voluptatem.
-                            Quia labore numquam explicabo id eos.: Explicabo totam dicta totam facilis est qui.
-                          to: MERCHANT:m_777
-                          type: PAYMENT
-                        - directed: true
-                          from: USER:u_123
-                          id: e123
-                          metrics:
-                            Et sunt.: Sit est eligendi soluta accusamus non omnis.
-                            Maxime cupiditate dolores fugit natus quia.: Quia voluptatem.
-                            Quia labore numquam explicabo id eos.: Explicabo totam dicta totam facilis est qui.
                           to: MERCHANT:m_777
                           type: PAYMENT
                 nodes:
@@ -626,14 +573,6 @@ components:
                         $ref: '#/components/schemas/GraphNode'
                     description: List of all entities in the network.
                     example:
-                        - id: USER:u_123
-                          key: u_123
-                          label: User u_123
-                          props:
-                            Et et eum eaque.: Voluptatem earum consectetur iste.
-                            Quaerat officia hic mollitia quae deserunt.: Soluta minima non.
-                            Qui quo dicta.: Aut quis iste nemo ut quisquam aspernatur.
-                          type: USER
                         - id: USER:u_123
                           key: u_123
                           label: User u_123
@@ -668,22 +607,40 @@ components:
                     - directed: true
                       from: USER:u_123
                       id: e123
-                      metrics:
-                        Et sunt.: Sit est eligendi soluta accusamus non omnis.
-                        Maxime cupiditate dolores fugit natus quia.: Quia voluptatem.
-                        Quia labore numquam explicabo id eos.: Explicabo totam dicta totam facilis est qui.
                       to: MERCHANT:m_777
                       type: PAYMENT
                     - directed: true
                       from: USER:u_123
                       id: e123
-                      metrics:
-                        Et sunt.: Sit est eligendi soluta accusamus non omnis.
-                        Maxime cupiditate dolores fugit natus quia.: Quia voluptatem.
-                        Quia labore numquam explicabo id eos.: Explicabo totam dicta totam facilis est qui.
+                      to: MERCHANT:m_777
+                      type: PAYMENT
+                    - directed: true
+                      from: USER:u_123
+                      id: e123
+                      to: MERCHANT:m_777
+                      type: PAYMENT
+                    - directed: true
+                      from: USER:u_123
+                      id: e123
                       to: MERCHANT:m_777
                       type: PAYMENT
                 nodes:
+                    - id: USER:u_123
+                      key: u_123
+                      label: User u_123
+                      props:
+                        Et et eum eaque.: Voluptatem earum consectetur iste.
+                        Quaerat officia hic mollitia quae deserunt.: Soluta minima non.
+                        Qui quo dicta.: Aut quis iste nemo ut quisquam aspernatur.
+                      type: USER
+                    - id: USER:u_123
+                      key: u_123
+                      label: User u_123
+                      props:
+                        Et et eum eaque.: Voluptatem earum consectetur iste.
+                        Quaerat officia hic mollitia quae deserunt.: Soluta minima non.
+                        Qui quo dicta.: Aut quis iste nemo ut quisquam aspernatur.
+                      type: USER
                     - id: USER:u_123
                       key: u_123
                       label: User u_123

@@ -13,9 +13,9 @@ import (
 
 // High-speed financial event ingestion service.
 type Service interface {
-	// Accepts a new financial event (Payment, Login, etc.) and updates the
+	// Accepts one or more financial events (Payment, Login, etc.) and updates the
 	// relationship graph.
-	PostEvent(context.Context, *CustomerEvent) (res *IngestResponse, err error)
+	PostEvent(context.Context, *BulkCustomerEvents) (res *BulkIngestResponse, err error)
 }
 
 // APIName is the name of the API as defined in the design.
@@ -34,7 +34,25 @@ const ServiceName = "ingest"
 // MethodKey key.
 var MethodNames = [1]string{"post_event"}
 
-// CustomerEvent is the payload type of the ingest service post_event method.
+// BulkCustomerEvents is the payload type of the ingest service post_event
+// method.
+type BulkCustomerEvents struct {
+	// List of events to ingest in-order.
+	Events []*CustomerEvent
+}
+
+// BulkIngestResponse is the result type of the ingest service post_event
+// method.
+type BulkIngestResponse struct {
+	// Whether all events were processed successfully.
+	Accepted bool
+	// Number of events accepted in this batch.
+	AcceptedCount int
+	// Number of events rejected in this batch.
+	FailedCount int
+}
+
+// Information about a financial activity or user action.
 type CustomerEvent struct {
 	// Unique identifier of the user (e.g. u_123).
 	UserID string
@@ -58,12 +76,6 @@ type CustomerEvent struct {
 	Exchange *string
 	// Remote IP address (not stored directly in graph).
 	IPAddress *string
-}
-
-// IngestResponse is the result type of the ingest service post_event method.
-type IngestResponse struct {
-	// Whether the event was successfully queued or processed.
-	Accepted bool
 }
 
 // Error returned when the request payload is malformed or invalid.
