@@ -7,3 +7,6 @@ const CreatePaymentMethodIndex = `CREATE INDEX ON :PaymentMethod(payment_method)
 const CreateBankIndex = `CREATE INDEX ON :Bank(issuing_bank)`
 const CreateWalletIndex = `CREATE INDEX ON :Wallet(wallet_address)`
 const CreateExchangeIndex = `CREATE INDEX ON :Exchange(exchange)`
+
+const QueryRelationshipTypes = `CALL db.relationshipTypes()`
+const QueryNodeLabels = `CALL db.labels()`

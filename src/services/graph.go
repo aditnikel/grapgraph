@@ -13,22 +13,13 @@ type GraphService struct {
 }
 
 func (s *GraphService) GetMetadata(ctx context.Context) (*graph.MetadataResponse, error) {
-	ets := make([]string, 0, len(model.AllEventTypes()))
-	for _, e := range model.AllEventTypes() {
-		ets = append(ets, string(e))
+	meta, err := s.Graph.GetMetadata(ctx)
+	if err != nil {
+		return nil, graph.BadRequest(err.Error())
 	}
-
 	return &graph.MetadataResponse{
-		NodeTypes: []string{
-			string(model.NodeUser),
-			string(model.NodeMerchant),
-			string(model.NodeExchange),
-			string(model.NodeWallet),
-			string(model.NodePaymentMethod),
-			string(model.NodeBank),
-			string(model.NodeDevice),
-		},
-		EdgeTypes: ets,
+		NodeTypes: meta.NodeTypes,
+		EdgeTypes: meta.EdgeTypes,
 	}, nil
 }
 

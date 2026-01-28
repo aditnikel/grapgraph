@@ -39,18 +39,23 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 		req.Limit.MaxEdges = s.Cfg.DefaultMaxEdges
 	}
 
-	edgeTypes := make([]model.EventType, 0, len(req.EdgeTypes))
-	for _, t := range req.EdgeTypes {
-		et, err := model.ParseEventType(t)
-		if err != nil {
-			return model.SubgraphResponse{}, err
+	// If specific types are requested, filter by them. Otherwise, include all.
+	var whereClause string
+	if len(req.EdgeTypes) > 0 {
+		edgeTypes := make([]string, 0, len(req.EdgeTypes))
+		for _, t := range req.EdgeTypes {
+			// Relaxed validation already allows dynamic types
+			et, err := model.ParseEventType(t)
+			if err != nil {
+				return model.SubgraphResponse{}, err
+			}
+			edgeTypes = append(edgeTypes, string(et))
 		}
-		edgeTypes = append(edgeTypes, et)
+		whereClause = fmt.Sprintf("type(r) IN [%s]", graph.QuoteEdgeTypes(toEventTypes(edgeTypes)))
+	} else {
+		// No filter = all types
+		whereClause = "true" // 1=1
 	}
-	if len(edgeTypes) == 0 {
-		edgeTypes = model.AllEventTypes()
-	}
-	quotedEdgeTypes := graph.QuoteEdgeTypes(edgeTypes)
 
 	windowStart := int64(0)
 	if req.TimeWindowMs > 0 {
@@ -200,7 +205,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 		if limit == 0 {
 			truncated = true
 		} else {
-			q := fmt.Sprintf(cypher.UserToEntityTemplate, quotedEdgeTypes)
+			q := fmt.Sprintf(cypher.UserToEntityTemplate, whereClause)
 			rows, err := s.Repo.QueryRows(ctx, q, map[string]any{
 				"user_id":      req.Root.Key,
 				"limit":        limit,
@@ -257,7 +262,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 					break
 				}
 
-				q := fmt.Sprintf(cypher.EntityToUserTemplate, quotedEdgeTypes)
+				q := fmt.Sprintf(cypher.EntityToUserTemplate, whereClause)
 				rows, err := s.Repo.QueryRows(ctx, q, map[string]any{
 					"entity_id":    e.id,
 					"limit":        perEntity,
@@ -315,7 +320,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 					break
 				}
 
-				q := fmt.Sprintf(cypher.UserToEntityTemplate, quotedEdgeTypes)
+				q := fmt.Sprintf(cypher.UserToEntityTemplate, whereClause)
 				rows, err := s.Repo.QueryRows(ctx, q, map[string]any{
 					"user_id":      uid,
 					"limit":        perUser,
@@ -359,6 +364,36 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 		Nodes:     mapToSlice(nodes),
 		Edges:     mapToSliceEdges(edges),
 		Truncated: truncated,
+	}, nil
+}
+
+func (s *GraphService) GetMetadata(ctx context.Context) (model.MetadataResponse, error) {
+	nodeTypes, err := s.Repo.QueryRows(ctx, cypher.QueryNodeLabels, nil)
+	if err != nil {
+		return model.MetadataResponse{}, err
+	}
+	edgeTypes, err := s.Repo.QueryRows(ctx, cypher.QueryRelationshipTypes, nil)
+	if err != nil {
+		return model.MetadataResponse{}, err
+	}
+
+	nt := make([]string, 0, len(nodeTypes))
+	for _, r := range nodeTypes {
+		if v, ok := r["label"].(string); ok {
+			nt = append(nt, v)
+		}
+	}
+
+	et := make([]string, 0, len(edgeTypes))
+	for _, r := range edgeTypes {
+		if v, ok := r["relationshipType"].(string); ok {
+			et = append(et, v)
+		}
+	}
+
+	return model.MetadataResponse{
+		NodeTypes: nt,
+		EdgeTypes: et,
 	}, nil
 }
 
@@ -431,10 +466,10 @@ func validateEdgeType(edgeType string) (string, error) {
 		return "", fmt.Errorf("edge_type required")
 	}
 	for _, r := range et {
-		if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' {
+		if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
 			continue
 		}
-		return "", fmt.Errorf("invalid edge_type: %s", edgeType)
+		return "", fmt.Errorf("invalid edge_type: %s (must be A-Z, 0-9, _, -)", edgeType)
 	}
 	return et, nil
 }
@@ -470,25 +505,6 @@ func (s *GraphService) resolveEntityInternalID(ctx context.Context, typ, key str
 	return toInt64(idv)
 }
 
-func buildMetrics(r map[string]any) map[string]any {
-	eventCount, _ := toInt64(r["event_count"])
-	totalAmount := mustFloat64(r["total_amount"])
-	avg := 0.0
-	if eventCount > 0 {
-		avg = totalAmount / float64(eventCount)
-	}
-	return map[string]any{
-		"event_count":           eventCount,
-		"event_count_30d":       mustInt64(r["event_count_30d"]),
-		"distinct_ip_count_30d": mustInt64(r["distinct_ip_count_30d"]),
-		"first_seen":            mustInt64(r["first_seen"]),
-		"last_seen":             mustInt64(r["last_seen"]),
-		"total_amount":          totalAmount,
-		"max_amount":            mustFloat64(r["max_amount"]),
-		"avg_amount":            avg,
-	}
-}
-
 func toInt64(v any) (int64, bool) {
 	switch x := v.(type) {
 	case int64:
@@ -506,28 +522,6 @@ func toInt64(v any) (int64, bool) {
 	}
 }
 
-func mustInt64(v any) int64 {
-	i, _ := toInt64(v)
-	return i
-}
-
-func mustFloat64(v any) float64 {
-	switch x := v.(type) {
-	case float64:
-		return x
-	case int64:
-		return float64(x)
-	case int:
-		return float64(x)
-	case string:
-		var f float64
-		_, _ = fmt.Sscan(x, &f)
-		return f
-	default:
-		return 0
-	}
-}
-
 func mapToSlice(m map[string]model.GraphNode) []model.GraphNode {
 	out := make([]model.GraphNode, 0, len(m))
 	for _, v := range m {
@@ -540,6 +534,14 @@ func mapToSliceEdges(m map[string]model.GraphEdge) []model.GraphEdge {
 	out := make([]model.GraphEdge, 0, len(m))
 	for _, v := range m {
 		out = append(out, v)
+	}
+	return out
+}
+
+func toEventTypes(s []string) []model.EventType {
+	out := make([]model.EventType, len(s))
+	for i, v := range s {
+		out[i] = model.EventType(v)
 	}
 	return out
 }

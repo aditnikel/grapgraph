@@ -81,24 +81,17 @@ func (g *Repo) UpsertAggregated(ctx context.Context, ev model.CustomerEvent, et 
 
 	relType := string(et)
 
-	moneyBlock := ""
 	params := map[string]any{
 		"user_id":    ev.UserID,
 		"target_key": targetKey,
 		"ts":         tsMillis,
-	}
-	if model.IsMoneyBearing(et) && amount != nil {
-		moneyBlock = cypher.MoneyAggBlock
-		params["amount"] = *amount
 	}
 
 	query := fmt.Sprintf(
 		cypher.UpsertAggregatedEdgeTemplate,
 		targetLabel,
 		targetKeyProp,
-		relType,
-		moneyBlock,
-	)
+		relType)
 
 	query = g.interpolate(query, params)
 

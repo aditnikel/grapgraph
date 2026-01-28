@@ -16,3 +16,8 @@ type GraphEdge struct {
 	Directed bool   `json:"directed"`
 	Manual   bool   `json:"manual"`
 }
+
+type MetadataResponse struct {
+	NodeTypes []string `json:"node_types"`
+	EdgeTypes []string `json:"edge_types"`
+}

@@ -22,11 +22,5 @@ SET
   r.last_seen = CASE WHEN r.last_seen < $ts THEN $ts ELSE r.last_seen END,
   r.event_count_30d = CASE WHEN ($ts - r.window_start_30d) > 2592000000 THEN 1 ELSE r.event_count_30d + 1 END,
   r.window_start_30d = CASE WHEN ($ts - r.window_start_30d) > 2592000000 THEN $ts ELSE r.window_start_30d END
-%s
 RETURN u.user_id
-`
-
-const MoneyAggBlock = `,
-  r.total_amount = r.total_amount + $amount,
-  r.max_amount = CASE WHEN r.max_amount < $amount THEN $amount ELSE r.max_amount END
 `
