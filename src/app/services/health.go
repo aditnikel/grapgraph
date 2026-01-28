@@ -5,7 +5,7 @@ import (
 
 	"github.com/aditnikel/grapgraph/gen/health"
 	"github.com/aditnikel/grapgraph/src/domain"
-	"github.com/aditnikel/grapgraph/src/observability"
+	"github.com/aditnikel/grapgraph/src/infra/observability"
 )
 
 type HealthService struct {

@@ -114,8 +114,8 @@ paths:
                         application/json:
                             schema:
                                 type: string
-                                example: Sit iure non corrupti minima est aut.
-                            example: Et est et placeat harum omnis.
+                                example: Qui natus ut autem possimus.
+                            example: Ipsa laboriosam error hic autem placeat itaque.
     /v1/graph/metadata:
         get:
             tags:
@@ -163,6 +163,7 @@ paths:
                             root:
                                 key: u_123
                                 type: USER
+                            time_window_ms: 2592000000
             responses:
                 "200":
                     description: OK response.
@@ -189,15 +190,15 @@ paths:
                                       key: u_123
                                       label: User u_123
                                       props:
-                                        Aut pariatur incidunt assumenda maxime perferendis.: Tempore perferendis dolores voluptatibus rem.
-                                        Expedita pariatur quia labore sapiente.: Odio laudantium ut et nulla rerum maxime.
+                                        Fugit quibusdam quod perferendis expedita pariatur quia.: Sapiente aut odio laudantium ut et nulla.
+                                        Voluptatem corrupti voluptas.: Qui delectus.
                                       type: USER
                                     - id: USER:u_123
                                       key: u_123
                                       label: User u_123
                                       props:
-                                        Aut pariatur incidunt assumenda maxime perferendis.: Tempore perferendis dolores voluptatibus rem.
-                                        Expedita pariatur quia labore sapiente.: Odio laudantium ut et nulla rerum maxime.
+                                        Fugit quibusdam quod perferendis expedita pariatur quia.: Sapiente aut odio laudantium ut et nulla.
+                                        Voluptatem corrupti voluptas.: Qui delectus.
                                       type: USER
                                 root: USER:u_123
                                 truncated: false
@@ -208,8 +209,8 @@ paths:
                         application/json:
                             schema:
                                 type: string
-                                example: Qui natus ut autem possimus.
-                            example: Ipsa laboriosam error hic autem placeat itaque.
+                                example: Provident facere sapiente.
+                            example: Error alias.
     /v1/ingest/event:
         post:
             tags:
@@ -250,8 +251,8 @@ paths:
                         application/json:
                             schema:
                                 type: string
-                                example: Provident facere sapiente.
-                            example: Error alias.
+                                example: Sit iure non corrupti minima est aut.
+                            example: Et est et placeat harum omnis.
 components:
     schemas:
         BulkCustomerEvents:
@@ -622,6 +623,13 @@ components:
                     required:
                         - type
                         - key
+                time_window_ms:
+                    type: integer
+                    description: Only include edges observed within the last N milliseconds. Omit or set to 0 for all time.
+                    default: 0
+                    example: 2592000000
+                    format: int64
+                    minimum: 0
             description: Parameters for extracting a localized network subgraph.
             example:
                 edge_types:
@@ -634,6 +642,7 @@ components:
                 root:
                     key: u_123
                     type: USER
+                time_window_ms: 2592000000
             required:
                 - root
                 - limit
@@ -760,7 +769,7 @@ tags:
       description: The openapi service serves the OpenAPI specification and interactive documentation.
     - name: health
       description: Health check service for monitoring service and database connectivity.
-    - name: ingest
-      description: High-speed financial event ingestion service.
     - name: graph
       description: Graph traversal service for fraud pattern analysis and subgraph extraction.
+    - name: ingest
+      description: High-speed financial event ingestion service.

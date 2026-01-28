@@ -9,11 +9,11 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/redis/rueidis"
 
-	"github.com/aditnikel/grapgraph/src/config"
 	"github.com/aditnikel/grapgraph/src/domain"
-	"github.com/aditnikel/grapgraph/src/graph"
-	"github.com/aditnikel/grapgraph/src/observability"
-	"github.com/aditnikel/grapgraph/src/seed"
+	"github.com/aditnikel/grapgraph/src/infra/config"
+	"github.com/aditnikel/grapgraph/src/infra/graph"
+	"github.com/aditnikel/grapgraph/src/infra/observability"
+	"github.com/aditnikel/grapgraph/src/infra/seed"
 )
 
 func main() {

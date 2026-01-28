@@ -26,7 +26,8 @@ type PostSubgraphRequestBody struct {
 	Hops *int `form:"hops,omitempty" json:"hops,omitempty" xml:"hops,omitempty"`
 	// Filter to only include these relationship types.
 	EdgeTypes []string `form:"edge_types,omitempty" json:"edge_types,omitempty" xml:"edge_types,omitempty"`
-	// Only include edges observed within the last N milliseconds.
+	// Only include edges observed within the last N milliseconds. Omit or set to 0
+	// for all time.
 	TimeWindowMs *int64 `form:"time_window_ms,omitempty" json:"time_window_ms,omitempty" xml:"time_window_ms,omitempty"`
 	// Resource budget for the response.
 	Limit *struct {
@@ -206,6 +207,9 @@ func NewPostSubgraphSubgraphRequest(body *PostSubgraphRequestBody) *graph.Subgra
 	if body.Hops != nil {
 		v.Hops = *body.Hops
 	}
+	if body.TimeWindowMs != nil {
+		v.TimeWindowMs = *body.TimeWindowMs
+	}
 	v.Root = &struct {
 		// Type of the root node (usually USER).
 		Type string
@@ -224,8 +228,8 @@ func NewPostSubgraphSubgraphRequest(body *PostSubgraphRequestBody) *graph.Subgra
 			v.EdgeTypes[i] = val
 		}
 	}
-	if body.TimeWindowMs != nil {
-		v.TimeWindowMs = *body.TimeWindowMs
+	if body.TimeWindowMs == nil {
+		v.TimeWindowMs = 0
 	}
 	v.Limit = &struct {
 		// Maximum number of nodes to return.
@@ -279,17 +283,17 @@ func ValidatePostSubgraphRequestBody(body *PostSubgraphRequestBody) (err error) 
 			err = goa.MergeErrors(err, goa.InvalidRangeError("body.hops", *body.Hops, 3, false))
 		}
 	}
+	if body.TimeWindowMs != nil {
+		if *body.TimeWindowMs < 0 {
+			err = goa.MergeErrors(err, goa.InvalidRangeError("body.time_window_ms", *body.TimeWindowMs, 0, true))
+		}
+	}
 	if body.Limit != nil {
 		if body.Limit.MaxNodes == nil {
 			err = goa.MergeErrors(err, goa.MissingFieldError("max_nodes", "body.limit"))
 		}
 		if body.Limit.MaxEdges == nil {
 			err = goa.MergeErrors(err, goa.MissingFieldError("max_edges", "body.limit"))
-		}
-	}
-	if body.TimeWindowMs != nil {
-		if *body.TimeWindowMs < 0 {
-			err = goa.MergeErrors(err, goa.InvalidRangeError("body.time_window_ms", *body.TimeWindowMs, 0, true))
 		}
 	}
 	return

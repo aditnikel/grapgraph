@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aditnikel/grapgraph/src/graph"
+	"github.com/aditnikel/grapgraph/src/infra/graph"
 	"github.com/aditnikel/grapgraph/src/ingest"
 	"github.com/aditnikel/grapgraph/src/model"
 )

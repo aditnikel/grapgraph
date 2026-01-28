@@ -10,9 +10,9 @@ import (
 
 	"github.com/redis/rueidis"
 
-	"github.com/aditnikel/grapgraph/src/graph/cypher"
+	"github.com/aditnikel/grapgraph/src/infra/graph/cypher"
+	"github.com/aditnikel/grapgraph/src/infra/observability"
 	"github.com/aditnikel/grapgraph/src/model"
-	"github.com/aditnikel/grapgraph/src/observability"
 )
 
 type Repo struct {

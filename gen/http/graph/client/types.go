@@ -26,8 +26,9 @@ type PostSubgraphRequestBody struct {
 	Hops int `form:"hops" json:"hops" xml:"hops"`
 	// Filter to only include these relationship types.
 	EdgeTypes []string `form:"edge_types,omitempty" json:"edge_types,omitempty" xml:"edge_types,omitempty"`
-	// Only include edges observed within the last N milliseconds.
-	TimeWindowMs int64 `form:"time_window_ms,omitempty" json:"time_window_ms,omitempty" xml:"time_window_ms,omitempty"`
+	// Only include edges observed within the last N milliseconds. Omit or set to 0
+	// for all time.
+	TimeWindowMs int64 `form:"time_window_ms" json:"time_window_ms" xml:"time_window_ms"`
 	// Resource budget for the response.
 	Limit *struct {
 		// Maximum number of nodes to return.
@@ -131,7 +132,8 @@ type NodeRefRequestBody struct {
 // the "post_subgraph" endpoint of the "graph" service.
 func NewPostSubgraphRequestBody(p *graph.SubgraphRequest) *PostSubgraphRequestBody {
 	body := &PostSubgraphRequestBody{
-		Hops: p.Hops,
+		Hops:         p.Hops,
+		TimeWindowMs: p.TimeWindowMs,
 	}
 	if p.Root != nil {
 		body.Root = &struct {
@@ -158,8 +160,8 @@ func NewPostSubgraphRequestBody(p *graph.SubgraphRequest) *PostSubgraphRequestBo
 	}
 	{
 		var zero int64
-		if p.TimeWindowMs != zero {
-			body.TimeWindowMs = p.TimeWindowMs
+		if body.TimeWindowMs == zero {
+			body.TimeWindowMs = 0
 		}
 	}
 	if p.Limit != nil {

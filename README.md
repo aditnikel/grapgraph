@@ -9,7 +9,6 @@
 - **Real-time Event Ingestion**: Aggregated upserts of user events (Logins, Payments, Withdrawals, etc.) into a graph structure.
 - **Industrial-Grade API Framework**: Rebuilt with **Goa v3** for design-first API development, providing automatic validation and OpenAPI documentation.
 - **Modern Spider-Web UI**: A premium D3.js powered dark-mode visualization tool with glassmorphism panels, relationship directionality (arrows), and entity icons.
-- **Real-time Event Ingestion**: Aggregated upserts of user events (Logins, Payments, Withdrawals, etc.) into a graph structure.
 - **Budget-Aware Subgraph Analysis**: Performant multi-hop traversal (up to 3 hops) with neighbor ranking and automatic results truncation.
 - **Rich Seed Data**: Includes realistic fraud scenarios (Money mules, Bot networks, Account takeovers).
 
@@ -18,8 +17,9 @@
 ## 🏗️ Architecture
 
 - **Goa v3 Layer**: Defines the API DSL in `/design`, generating type-safe controllers and transport encoders/decoders.
-- **Business Services**: Core logic in `src/service/` handles graph traversals and ingestion rules.
-- **FalkorDB Repository**: High-performance interaction with Redis Graph using localized Cypher blocks.
+- **App Adapters**: Goa service implementations and HTTP middleware in `src/app/`.
+- **Domain Services**: Core business logic in `src/domain/` and shared DTOs in `src/model/`.
+- **FalkorDB Repository**: High-performance interaction with Redis Graph via `src/infra/graph/`.
 - **Web Frontend**: Modern single-page application using D3.js and responsive CSS.
 
 ---
@@ -44,7 +44,7 @@
 2. **Configure Environment Variables**:
 
    ```bash
-   cp .env.exampe .env
+   cp .env.example .env
    ```
 
    _Note: Default settings are optimized for the provided Docker Compose setup._
@@ -122,12 +122,12 @@
 - `cmd/`: Application entry points (`api`, `seed`).
 - `design/`: Goa v3 API Design DSL.
 - `gen/`: Re-generatable Goa boilerplate (HTTP, endpoints, types).
-- `src/`: Core logic organized by domain.
-  - `goa_services/`: Wrappers implementing Goa interfaces.
-  - `service/`: Core business logic (Ingest and Graph).
-  - `graph/`: Redis interaction and Cypher templates.
-  - `model/`: Shared domain objects and DTOs.
-  - `observability/`: Logging and monitoring.
+- `src/`: Core logic organized by layer (see `src/README.md`).
+  - `app/`: Goa services and HTTP middleware.
+  - `domain/`: Business services (Graph, Ingest).
+  - `infra/`: Infrastructure adapters (config, graph repo, logging, seed).
+  - `ingest/`: Event parsing/normalization helpers.
+  - `model/`: Shared DTOs and enums.
 - `web/`: Modern D3 visualization interface.
 
 ---

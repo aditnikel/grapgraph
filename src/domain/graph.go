@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aditnikel/grapgraph/src/config"
-	"github.com/aditnikel/grapgraph/src/graph"
-	"github.com/aditnikel/grapgraph/src/graph/cypher"
+	"github.com/aditnikel/grapgraph/src/infra/config"
+	"github.com/aditnikel/grapgraph/src/infra/graph"
+	"github.com/aditnikel/grapgraph/src/infra/graph/cypher"
 	"github.com/aditnikel/grapgraph/src/model"
 )
 

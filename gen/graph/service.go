@@ -109,7 +109,8 @@ type SubgraphRequest struct {
 	Hops int
 	// Filter to only include these relationship types.
 	EdgeTypes []string
-	// Only include edges observed within the last N milliseconds.
+	// Only include edges observed within the last N milliseconds. Omit or set to 0
+	// for all time.
 	TimeWindowMs int64
 	// Resource budget for the response.
 	Limit *struct {

@@ -23,7 +23,7 @@ func BuildPostSubgraphPayload(graphPostSubgraphBody string) (*graph.SubgraphRequ
 	{
 		err = json.Unmarshal([]byte(graphPostSubgraphBody), &body)
 		if err != nil {
-			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"edge_types\": [\n         \"PAYMENT\",\n         \"LOGIN\"\n      ],\n      \"hops\": 2,\n      \"limit\": {\n         \"max_edges\": 100,\n         \"max_nodes\": 50\n      },\n      \"root\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      }\n   }'")
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"edge_types\": [\n         \"PAYMENT\",\n         \"LOGIN\"\n      ],\n      \"hops\": 2,\n      \"limit\": {\n         \"max_edges\": 100,\n         \"max_nodes\": 50\n      },\n      \"root\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      },\n      \"time_window_ms\": 2592000000\n   }'")
 		}
 		if body.Root == nil {
 			err = goa.MergeErrors(err, goa.MissingFieldError("root", "body"))
@@ -69,6 +69,12 @@ func BuildPostSubgraphPayload(graphPostSubgraphBody string) (*graph.SubgraphRequ
 		v.EdgeTypes = make([]string, len(body.EdgeTypes))
 		for i, val := range body.EdgeTypes {
 			v.EdgeTypes[i] = val
+		}
+	}
+	{
+		var zero int64
+		if v.TimeWindowMs == zero {
+			v.TimeWindowMs = 0
 		}
 	}
 	if body.Limit != nil {

@@ -8,8 +8,8 @@ import (
 
 	"github.com/redis/rueidis"
 
-	"github.com/aditnikel/grapgraph/src/graph"
-	"github.com/aditnikel/grapgraph/src/observability"
+	"github.com/aditnikel/grapgraph/src/infra/graph"
+	"github.com/aditnikel/grapgraph/src/infra/observability"
 )
 
 func TestHealthPing(t *testing.T) {
