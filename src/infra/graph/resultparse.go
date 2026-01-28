@@ -15,7 +15,7 @@ func ParseCompact(resp any) ([]map[string]any, error) {
 	}
 	cols := make([]string, 0, len(headerAny))
 	for _, c := range headerAny {
-		cols = append(cols, fmt.Sprint(c))
+		cols = append(cols, fmt.Sprint(unpackCell(c)))
 	}
 
 	rowsAny, ok := arr[1].([]any)
@@ -31,9 +31,17 @@ func ParseCompact(resp any) ([]map[string]any, error) {
 		}
 		m := map[string]any{}
 		for i := 0; i < len(cols) && i < len(rowArr); i++ {
-			m[cols[i]] = rowArr[i]
+			m[cols[i]] = unpackCell(rowArr[i])
 		}
 		out = append(out, m)
 	}
 	return out, nil
+}
+
+// Compact response cells are typically [typecode, value].
+func unpackCell(v any) any {
+	if arr, ok := v.([]any); ok && len(arr) >= 2 {
+		return arr[1]
+	}
+	return v
 }

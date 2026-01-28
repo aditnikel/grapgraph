@@ -157,6 +157,90 @@ func DecodePostSubgraphResponse(decoder func(*http.Response) goahttp.Decoder, re
 	}
 }
 
+// BuildPostManualEdgeRequest instantiates a HTTP request object with method
+// and path set to call the "graph" service "post_manual_edge" endpoint
+func (c *Client) BuildPostManualEdgeRequest(ctx context.Context, v any) (*http.Request, error) {
+	u := &url.URL{Scheme: c.scheme, Host: c.host, Path: PostManualEdgeGraphPath()}
+	req, err := http.NewRequest("POST", u.String(), nil)
+	if err != nil {
+		return nil, goahttp.ErrInvalidURL("graph", "post_manual_edge", u.String(), err)
+	}
+	if ctx != nil {
+		req = req.WithContext(ctx)
+	}
+
+	return req, nil
+}
+
+// EncodePostManualEdgeRequest returns an encoder for requests sent to the
+// graph post_manual_edge server.
+func EncodePostManualEdgeRequest(encoder func(*http.Request) goahttp.Encoder) func(*http.Request, any) error {
+	return func(req *http.Request, v any) error {
+		p, ok := v.(*graph.ManualEdgeRequest)
+		if !ok {
+			return goahttp.ErrInvalidType("graph", "post_manual_edge", "*graph.ManualEdgeRequest", v)
+		}
+		body := NewPostManualEdgeRequestBody(p)
+		if err := encoder(req).Encode(&body); err != nil {
+			return goahttp.ErrEncodingError("graph", "post_manual_edge", err)
+		}
+		return nil
+	}
+}
+
+// DecodePostManualEdgeResponse returns a decoder for responses returned by the
+// graph post_manual_edge endpoint. restoreBody controls whether the response
+// body should be restored after having been read.
+// DecodePostManualEdgeResponse may return the following errors:
+//   - "bad_request" (type graph.BadRequest): http.StatusBadRequest
+//   - error: internal error
+func DecodePostManualEdgeResponse(decoder func(*http.Response) goahttp.Decoder, restoreBody bool) func(*http.Response) (any, error) {
+	return func(resp *http.Response) (any, error) {
+		if restoreBody {
+			b, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, err
+			}
+			resp.Body = io.NopCloser(bytes.NewBuffer(b))
+			defer func() {
+				resp.Body = io.NopCloser(bytes.NewBuffer(b))
+			}()
+		} else {
+			defer resp.Body.Close()
+		}
+		switch resp.StatusCode {
+		case http.StatusCreated:
+			var (
+				body PostManualEdgeResponseBody
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("graph", "post_manual_edge", err)
+			}
+			err = ValidatePostManualEdgeResponseBody(&body)
+			if err != nil {
+				return nil, goahttp.ErrValidationError("graph", "post_manual_edge", err)
+			}
+			res := NewPostManualEdgeGraphEdgeCreated(&body)
+			return res, nil
+		case http.StatusBadRequest:
+			var (
+				body string
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("graph", "post_manual_edge", err)
+			}
+			return nil, NewPostManualEdgeBadRequest(body)
+		default:
+			body, _ := io.ReadAll(resp.Body)
+			return nil, goahttp.ErrInvalidResponse("graph", "post_manual_edge", resp.StatusCode, string(body))
+		}
+	}
+}
+
 // unmarshalGraphNodeResponseBodyToGraphGraphNode builds a value of type
 // *graph.GraphNode from a value of type *GraphNodeResponseBody.
 func unmarshalGraphNodeResponseBodyToGraphGraphNode(v *GraphNodeResponseBody) *graph.GraphNode {
@@ -187,6 +271,29 @@ func unmarshalGraphEdgeResponseBodyToGraphGraphEdge(v *GraphEdgeResponseBody) *g
 		From:     *v.From,
 		To:       *v.To,
 		Directed: *v.Directed,
+		Manual:   *v.Manual,
+	}
+
+	return res
+}
+
+// marshalGraphNodeRefToNodeRefRequestBody builds a value of type
+// *NodeRefRequestBody from a value of type *graph.NodeRef.
+func marshalGraphNodeRefToNodeRefRequestBody(v *graph.NodeRef) *NodeRefRequestBody {
+	res := &NodeRefRequestBody{
+		Type: v.Type,
+		Key:  v.Key,
+	}
+
+	return res
+}
+
+// marshalNodeRefRequestBodyToGraphNodeRef builds a value of type
+// *graph.NodeRef from a value of type *NodeRefRequestBody.
+func marshalNodeRefRequestBodyToGraphNodeRef(v *NodeRefRequestBody) *graph.NodeRef {
+	res := &graph.NodeRef{
+		Type: v.Type,
+		Key:  v.Key,
 	}
 
 	return res

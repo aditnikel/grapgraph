@@ -78,6 +78,41 @@ paths:
                         type: file
             schemes:
                 - http
+    /v1/graph/edge:
+        post:
+            tags:
+                - graph
+            summary: post_manual_edge graph
+            description: Creates a manual relationship between two nodes.
+            operationId: graph#post_manual_edge
+            parameters:
+                - name: post_manual_edge_request_body
+                  in: body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/ManualEdgeRequest'
+                    required:
+                        - from
+                        - to
+                        - edge_type
+            responses:
+                "201":
+                    description: Created response.
+                    schema:
+                        $ref: '#/definitions/GraphEdge'
+                        required:
+                            - id
+                            - type
+                            - from
+                            - to
+                            - directed
+                            - manual
+                "400":
+                    description: Bad Request response.
+                    schema:
+                        type: string
+            schemes:
+                - http
     /v1/graph/metadata:
         get:
             tags:
@@ -297,6 +332,10 @@ definitions:
                 type: string
                 description: Unique ID for the specific relationship.
                 example: e123
+            manual:
+                type: boolean
+                description: Whether the relationship was manually added.
+                example: false
             to:
                 type: string
                 description: ID of the target node.
@@ -310,6 +349,7 @@ definitions:
             directed: true
             from: USER:u_123
             id: e123
+            manual: false
             to: MERCHANT:m_777
             type: PAYMENT
         required:
@@ -318,6 +358,7 @@ definitions:
             - from
             - to
             - directed
+            - manual
     GraphNode:
         title: GraphNode
         type: object
@@ -338,7 +379,9 @@ definitions:
                 type: object
                 description: Additional key-value properties.
                 example:
-                    Excepturi quod eos exercitationem tempore aspernatur dolorem.: Reprehenderit facere sed.
+                    Accusantium repellat dolores quae.: Ratione dolor natus dolor maiores magnam.
+                    Fugiat rerum iste sapiente ipsam.: Autem quasi deserunt magni rerum labore.
+                    Sed esse doloremque.: Enim est unde qui voluptatibus.
                 additionalProperties: true
             type:
                 type: string
@@ -350,9 +393,7 @@ definitions:
             key: u_123
             label: User u_123
             props:
-                Autem quasi deserunt magni rerum labore.: Omnis reiciendis dolores.
-                Occaecati enim est unde qui voluptatibus.: Accusantium repellat dolores quae.
-                Ratione dolor natus dolor maiores magnam.: Fugiat rerum iste sapiente ipsam.
+                Reiciendis dolores repudiandae earum.: Repellendus odio quos modi nisi.
             type: USER
         required:
             - id
@@ -376,6 +417,30 @@ definitions:
             ok: true
         required:
             - ok
+    ManualEdgeRequest:
+        title: ManualEdgeRequest
+        type: object
+        properties:
+            edge_type:
+                type: string
+                description: Relationship type (e.g. PAYMENT, MANUAL).
+                example: MANUAL
+            from:
+                $ref: '#/definitions/NodeRef'
+            to:
+                $ref: '#/definitions/NodeRef'
+        example:
+            edge_type: MANUAL
+            from:
+                key: u_123
+                type: USER
+            to:
+                key: u_123
+                type: USER
+        required:
+            - from
+            - to
+            - edge_type
     MetadataResponse:
         title: MetadataResponse
         type: object
@@ -384,7 +449,7 @@ definitions:
                 type: array
                 items:
                     type: string
-                    example: Eligendi eius quis.
+                    example: Eos exercitationem tempore aspernatur dolorem vel.
                 description: All valid event types.
                 example:
                     - PAYMENT
@@ -394,7 +459,7 @@ definitions:
                 type: array
                 items:
                     type: string
-                    example: Rerum sed placeat.
+                    example: Assumenda excepturi.
                 description: All valid entity types.
                 example:
                     - USER
@@ -412,6 +477,25 @@ definitions:
         required:
             - node_types
             - edge_types
+    NodeRef:
+        title: NodeRef
+        type: object
+        properties:
+            key:
+                type: string
+                description: The unique key of the node.
+                example: u_123
+            type:
+                type: string
+                description: Type of the node.
+                example: USER
+        description: A reference to a specific node in the graph.
+        example:
+            key: u_123
+            type: USER
+        required:
+            - type
+            - key
     SubgraphRequest:
         title: SubgraphRequest
         type: object
@@ -420,19 +504,18 @@ definitions:
                 type: array
                 items:
                     type: string
-                    example: Quos modi nisi iure dolore ea.
+                    example: Iusto quasi.
                 description: Filter to only include these relationship types.
                 example:
                     - PAYMENT
                     - LOGIN
             hops:
                 type: integer
-                description: Number of hops to traverse (1-3).
+                description: Number of hops to traverse (>=1).
                 default: 2
                 example: 2
                 format: int64
                 minimum: 1
-                maximum: 3
             limit:
                 type: object
                 properties:
@@ -455,6 +538,13 @@ definitions:
                 required:
                     - max_nodes
                     - max_edges
+            min_event_count:
+                type: integer
+                description: Only include edges with at least this event_count. Set to 0 to disable.
+                default: 0
+                example: 2
+                format: int64
+                minimum: 0
             root:
                 type: object
                 properties:
@@ -473,6 +563,13 @@ definitions:
                 required:
                     - type
                     - key
+            time_window_ms:
+                type: integer
+                description: Only include edges observed within the last N milliseconds. Omit or set to 0 for all time.
+                default: 0
+                example: 2592000000
+                format: int64
+                minimum: 0
         example:
             edge_types:
                 - PAYMENT
@@ -481,9 +578,11 @@ definitions:
             limit:
                 max_edges: 100
                 max_nodes: 50
+            min_event_count: 2
             root:
                 key: u_123
                 type: USER
+            time_window_ms: 2592000000
         required:
             - root
             - limit
@@ -500,21 +599,19 @@ definitions:
                     - directed: true
                       from: USER:u_123
                       id: e123
+                      manual: false
                       to: MERCHANT:m_777
                       type: PAYMENT
                     - directed: true
                       from: USER:u_123
                       id: e123
+                      manual: false
                       to: MERCHANT:m_777
                       type: PAYMENT
                     - directed: true
                       from: USER:u_123
                       id: e123
-                      to: MERCHANT:m_777
-                      type: PAYMENT
-                    - directed: true
-                      from: USER:u_123
-                      id: e123
+                      manual: false
                       to: MERCHANT:m_777
                       type: PAYMENT
             nodes:
@@ -527,22 +624,22 @@ definitions:
                       key: u_123
                       label: User u_123
                       props:
-                        Aut pariatur incidunt assumenda maxime perferendis.: Tempore perferendis dolores voluptatibus rem.
-                        Expedita pariatur quia labore sapiente.: Odio laudantium ut et nulla rerum maxime.
+                        Fugit quibusdam quod perferendis expedita pariatur quia.: Sapiente aut odio laudantium ut et nulla.
+                        Voluptatem corrupti voluptas.: Qui delectus.
                       type: USER
                     - id: USER:u_123
                       key: u_123
                       label: User u_123
                       props:
-                        Aut pariatur incidunt assumenda maxime perferendis.: Tempore perferendis dolores voluptatibus rem.
-                        Expedita pariatur quia labore sapiente.: Odio laudantium ut et nulla rerum maxime.
+                        Fugit quibusdam quod perferendis expedita pariatur quia.: Sapiente aut odio laudantium ut et nulla.
+                        Voluptatem corrupti voluptas.: Qui delectus.
                       type: USER
                     - id: USER:u_123
                       key: u_123
                       label: User u_123
                       props:
-                        Aut pariatur incidunt assumenda maxime perferendis.: Tempore perferendis dolores voluptatibus rem.
-                        Expedita pariatur quia labore sapiente.: Odio laudantium ut et nulla rerum maxime.
+                        Fugit quibusdam quod perferendis expedita pariatur quia.: Sapiente aut odio laudantium ut et nulla.
+                        Voluptatem corrupti voluptas.: Qui delectus.
                       type: USER
             root:
                 type: string
@@ -561,16 +658,25 @@ definitions:
                 - directed: true
                   from: USER:u_123
                   id: e123
+                  manual: false
                   to: MERCHANT:m_777
                   type: PAYMENT
                 - directed: true
                   from: USER:u_123
                   id: e123
+                  manual: false
                   to: MERCHANT:m_777
                   type: PAYMENT
                 - directed: true
                   from: USER:u_123
                   id: e123
+                  manual: false
+                  to: MERCHANT:m_777
+                  type: PAYMENT
+                - directed: true
+                  from: USER:u_123
+                  id: e123
+                  manual: false
                   to: MERCHANT:m_777
                   type: PAYMENT
             nodes:
@@ -578,22 +684,29 @@ definitions:
                   key: u_123
                   label: User u_123
                   props:
-                    Aut pariatur incidunt assumenda maxime perferendis.: Tempore perferendis dolores voluptatibus rem.
-                    Expedita pariatur quia labore sapiente.: Odio laudantium ut et nulla rerum maxime.
+                    Fugit quibusdam quod perferendis expedita pariatur quia.: Sapiente aut odio laudantium ut et nulla.
+                    Voluptatem corrupti voluptas.: Qui delectus.
                   type: USER
                 - id: USER:u_123
                   key: u_123
                   label: User u_123
                   props:
-                    Aut pariatur incidunt assumenda maxime perferendis.: Tempore perferendis dolores voluptatibus rem.
-                    Expedita pariatur quia labore sapiente.: Odio laudantium ut et nulla rerum maxime.
+                    Fugit quibusdam quod perferendis expedita pariatur quia.: Sapiente aut odio laudantium ut et nulla.
+                    Voluptatem corrupti voluptas.: Qui delectus.
                   type: USER
                 - id: USER:u_123
                   key: u_123
                   label: User u_123
                   props:
-                    Aut pariatur incidunt assumenda maxime perferendis.: Tempore perferendis dolores voluptatibus rem.
-                    Expedita pariatur quia labore sapiente.: Odio laudantium ut et nulla rerum maxime.
+                    Fugit quibusdam quod perferendis expedita pariatur quia.: Sapiente aut odio laudantium ut et nulla.
+                    Voluptatem corrupti voluptas.: Qui delectus.
+                  type: USER
+                - id: USER:u_123
+                  key: u_123
+                  label: User u_123
+                  props:
+                    Fugit quibusdam quod perferendis expedita pariatur quia.: Sapiente aut odio laudantium ut et nulla.
+                    Voluptatem corrupti voluptas.: Qui delectus.
                   type: USER
             root: USER:u_123
             truncated: false

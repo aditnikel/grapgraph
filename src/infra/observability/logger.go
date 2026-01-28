@@ -12,20 +12,25 @@ type Logger struct {
 }
 
 func New(level string) *Logger {
-	return &Logger{level: level}
+	return &Logger{level: normalizeLevel(level)}
 }
 
 type Fields map[string]any
 
+func (l *Logger) Debug(msg string, f Fields) { l.log("debug", msg, f) }
 func (l *Logger) Info(msg string, f Fields)  { l.log("info", msg, f) }
 func (l *Logger) Warn(msg string, f Fields)  { l.log("warn", msg, f) }
 func (l *Logger) Error(msg string, f Fields) { l.log("error", msg, f) }
 
 func (l *Logger) log(level, msg string, f Fields) {
-	if l.level == "error" && level != "error" {
+	if l == nil {
 		return
 	}
-	if l.level == "warn" && level == "info" {
+
+	level = normalizeLevel(level)
+	current := levelPriority(l.level)
+	incoming := levelPriority(level)
+	if incoming < current {
 		return
 	}
 
@@ -34,8 +39,10 @@ func (l *Logger) log(level, msg string, f Fields) {
 		"level": level,
 		"msg":   msg,
 	}
-	for k, v := range f {
-		m[k] = v
+	if f != nil {
+		for k, v := range f {
+			m[k] = v
+		}
 	}
 
 	b, err := json.Marshal(m)
@@ -45,4 +52,28 @@ func (l *Logger) log(level, msg string, f Fields) {
 		return
 	}
 	fmt.Fprintln(os.Stdout, string(b))
+}
+
+func normalizeLevel(level string) string {
+	switch level {
+	case "debug", "info", "warn", "error":
+		return level
+	default:
+		return "info"
+	}
+}
+
+func levelPriority(level string) int {
+	switch level {
+	case "debug":
+		return 10
+	case "info":
+		return 20
+	case "warn":
+		return 30
+	case "error":
+		return 40
+	default:
+		return 20
+	}
 }

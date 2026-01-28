@@ -20,12 +20,12 @@ import (
 	openapisvr "github.com/aditnikel/grapgraph/gen/http/openapi/server"
 	"github.com/aditnikel/grapgraph/gen/ingest"
 	"github.com/aditnikel/grapgraph/gen/openapi"
-	"github.com/aditnikel/grapgraph/src/config"
+	custmid "github.com/aditnikel/grapgraph/src/app/middleware"
+	goa_services "github.com/aditnikel/grapgraph/src/app/services"
 	"github.com/aditnikel/grapgraph/src/domain"
-	repo "github.com/aditnikel/grapgraph/src/graph"
-	custmid "github.com/aditnikel/grapgraph/src/httpapi/middleware"
-	"github.com/aditnikel/grapgraph/src/observability"
-	goa_services "github.com/aditnikel/grapgraph/src/services"
+	"github.com/aditnikel/grapgraph/src/infra/config"
+	repo "github.com/aditnikel/grapgraph/src/infra/graph"
+	"github.com/aditnikel/grapgraph/src/infra/observability"
 )
 
 func main() {
@@ -47,7 +47,7 @@ func main() {
 	}
 	defer rdb.Close()
 
-	gRepo := repo.New(rdb, cfg.GraphName, cfg.DBTimeout)
+	gRepo := repo.New(rdb, cfg.GraphName, cfg.DBTimeout, log)
 	gRepo.EnsureSchema(context.Background())
 
 	// Initialize domain services

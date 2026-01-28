@@ -22,10 +22,15 @@ type PostSubgraphRequestBody struct {
 		// The unique key of the root node.
 		Key string `form:"key" json:"key" xml:"key"`
 	} `form:"root" json:"root" xml:"root"`
-	// Number of hops to traverse (1-3).
+	// Number of hops to traverse (>=1).
 	Hops int `form:"hops" json:"hops" xml:"hops"`
 	// Filter to only include these relationship types.
 	EdgeTypes []string `form:"edge_types,omitempty" json:"edge_types,omitempty" xml:"edge_types,omitempty"`
+	// Only include edges with at least this event_count. Set to 0 to disable.
+	MinEventCount int `form:"min_event_count" json:"min_event_count" xml:"min_event_count"`
+	// Only include edges observed within the last N milliseconds. Omit or set to 0
+	// for all time.
+	TimeWindowMs int64 `form:"time_window_ms" json:"time_window_ms" xml:"time_window_ms"`
 	// Resource budget for the response.
 	Limit *struct {
 		// Maximum number of nodes to return.
@@ -33,6 +38,17 @@ type PostSubgraphRequestBody struct {
 		// Maximum number of edges to return.
 		MaxEdges int `form:"max_edges" json:"max_edges" xml:"max_edges"`
 	} `form:"limit" json:"limit" xml:"limit"`
+}
+
+// PostManualEdgeRequestBody is the type of the "graph" service
+// "post_manual_edge" endpoint HTTP request body.
+type PostManualEdgeRequestBody struct {
+	// Source node.
+	From *NodeRefRequestBody `form:"from" json:"from" xml:"from"`
+	// Target node.
+	To *NodeRefRequestBody `form:"to" json:"to" xml:"to"`
+	// Relationship type (e.g. PAYMENT, MANUAL).
+	EdgeType string `form:"edge_type" json:"edge_type" xml:"edge_type"`
 }
 
 // GetMetadataResponseBody is the type of the "graph" service "get_metadata"
@@ -57,6 +73,23 @@ type PostSubgraphResponseBody struct {
 	Edges []*GraphEdgeResponseBody `form:"edges,omitempty" json:"edges,omitempty" xml:"edges,omitempty"`
 	// Indicates if the result was clipped by performance budgets.
 	Truncated *bool `form:"truncated,omitempty" json:"truncated,omitempty" xml:"truncated,omitempty"`
+}
+
+// PostManualEdgeResponseBody is the type of the "graph" service
+// "post_manual_edge" endpoint HTTP response body.
+type PostManualEdgeResponseBody struct {
+	// Unique ID for the specific relationship.
+	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
+	// The type of connection (e.g. PAYMENT).
+	Type *string `form:"type,omitempty" json:"type,omitempty" xml:"type,omitempty"`
+	// ID of the source node.
+	From *string `form:"from,omitempty" json:"from,omitempty" xml:"from,omitempty"`
+	// ID of the target node.
+	To *string `form:"to,omitempty" json:"to,omitempty" xml:"to,omitempty"`
+	// Whether the relationship has a specific flow direction.
+	Directed *bool `form:"directed,omitempty" json:"directed,omitempty" xml:"directed,omitempty"`
+	// Whether the relationship was manually added.
+	Manual *bool `form:"manual,omitempty" json:"manual,omitempty" xml:"manual,omitempty"`
 }
 
 // GraphNodeResponseBody is used to define fields on response body types.
@@ -85,13 +118,25 @@ type GraphEdgeResponseBody struct {
 	To *string `form:"to,omitempty" json:"to,omitempty" xml:"to,omitempty"`
 	// Whether the relationship has a specific flow direction.
 	Directed *bool `form:"directed,omitempty" json:"directed,omitempty" xml:"directed,omitempty"`
+	// Whether the relationship was manually added.
+	Manual *bool `form:"manual,omitempty" json:"manual,omitempty" xml:"manual,omitempty"`
+}
+
+// NodeRefRequestBody is used to define fields on request body types.
+type NodeRefRequestBody struct {
+	// Type of the node.
+	Type string `form:"type" json:"type" xml:"type"`
+	// The unique key of the node.
+	Key string `form:"key" json:"key" xml:"key"`
 }
 
 // NewPostSubgraphRequestBody builds the HTTP request body from the payload of
 // the "post_subgraph" endpoint of the "graph" service.
 func NewPostSubgraphRequestBody(p *graph.SubgraphRequest) *PostSubgraphRequestBody {
 	body := &PostSubgraphRequestBody{
-		Hops: p.Hops,
+		Hops:          p.Hops,
+		MinEventCount: p.MinEventCount,
+		TimeWindowMs:  p.TimeWindowMs,
 	}
 	if p.Root != nil {
 		body.Root = &struct {
@@ -116,6 +161,18 @@ func NewPostSubgraphRequestBody(p *graph.SubgraphRequest) *PostSubgraphRequestBo
 			body.EdgeTypes[i] = val
 		}
 	}
+	{
+		var zero int
+		if body.MinEventCount == zero {
+			body.MinEventCount = 0
+		}
+	}
+	{
+		var zero int64
+		if body.TimeWindowMs == zero {
+			body.TimeWindowMs = 0
+		}
+	}
 	if p.Limit != nil {
 		body.Limit = &struct {
 			// Maximum number of nodes to return.
@@ -126,6 +183,21 @@ func NewPostSubgraphRequestBody(p *graph.SubgraphRequest) *PostSubgraphRequestBo
 			MaxNodes: p.Limit.MaxNodes,
 			MaxEdges: p.Limit.MaxEdges,
 		}
+	}
+	return body
+}
+
+// NewPostManualEdgeRequestBody builds the HTTP request body from the payload
+// of the "post_manual_edge" endpoint of the "graph" service.
+func NewPostManualEdgeRequestBody(p *graph.ManualEdgeRequest) *PostManualEdgeRequestBody {
+	body := &PostManualEdgeRequestBody{
+		EdgeType: p.EdgeType,
+	}
+	if p.From != nil {
+		body.From = marshalGraphNodeRefToNodeRefRequestBody(p.From)
+	}
+	if p.To != nil {
+		body.To = marshalGraphNodeRefToNodeRefRequestBody(p.To)
 	}
 	return body
 }
@@ -182,6 +254,29 @@ func NewPostSubgraphBadRequest(body string) graph.BadRequest {
 	return v
 }
 
+// NewPostManualEdgeGraphEdgeCreated builds a "graph" service
+// "post_manual_edge" endpoint result from a HTTP "Created" response.
+func NewPostManualEdgeGraphEdgeCreated(body *PostManualEdgeResponseBody) *graph.GraphEdge {
+	v := &graph.GraphEdge{
+		ID:       *body.ID,
+		Type:     *body.Type,
+		From:     *body.From,
+		To:       *body.To,
+		Directed: *body.Directed,
+		Manual:   *body.Manual,
+	}
+
+	return v
+}
+
+// NewPostManualEdgeBadRequest builds a graph service post_manual_edge endpoint
+// bad_request error.
+func NewPostManualEdgeBadRequest(body string) graph.BadRequest {
+	v := graph.BadRequest(body)
+
+	return v
+}
+
 // ValidateGetMetadataResponseBody runs the validations defined on
 // get_metadata_response_body
 func ValidateGetMetadataResponseBody(body *GetMetadataResponseBody) (err error) {
@@ -229,6 +324,30 @@ func ValidatePostSubgraphResponseBody(body *PostSubgraphResponseBody) (err error
 	return
 }
 
+// ValidatePostManualEdgeResponseBody runs the validations defined on
+// post_manual_edge_response_body
+func ValidatePostManualEdgeResponseBody(body *PostManualEdgeResponseBody) (err error) {
+	if body.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if body.Type == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("type", "body"))
+	}
+	if body.From == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("from", "body"))
+	}
+	if body.To == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("to", "body"))
+	}
+	if body.Directed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("directed", "body"))
+	}
+	if body.Manual == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("manual", "body"))
+	}
+	return
+}
+
 // ValidateGraphNodeResponseBody runs the validations defined on
 // GraphNodeResponseBody
 func ValidateGraphNodeResponseBody(body *GraphNodeResponseBody) (err error) {
@@ -264,6 +383,9 @@ func ValidateGraphEdgeResponseBody(body *GraphEdgeResponseBody) (err error) {
 	}
 	if body.Directed == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("directed", "body"))
+	}
+	if body.Manual == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("manual", "body"))
 	}
 	return
 }

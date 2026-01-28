@@ -95,6 +95,71 @@ func EncodePostSubgraphError(encoder func(context.Context, http.ResponseWriter) 
 	}
 }
 
+// EncodePostManualEdgeResponse returns an encoder for responses returned by
+// the graph post_manual_edge endpoint.
+func EncodePostManualEdgeResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
+	return func(ctx context.Context, w http.ResponseWriter, v any) error {
+		res, _ := v.(*graph.GraphEdge)
+		enc := encoder(ctx, w)
+		body := NewPostManualEdgeResponseBody(res)
+		w.WriteHeader(http.StatusCreated)
+		return enc.Encode(body)
+	}
+}
+
+// DecodePostManualEdgeRequest returns a decoder for requests sent to the graph
+// post_manual_edge endpoint.
+func DecodePostManualEdgeRequest(mux goahttp.Muxer, decoder func(*http.Request) goahttp.Decoder) func(*http.Request) (*graph.ManualEdgeRequest, error) {
+	return func(r *http.Request) (*graph.ManualEdgeRequest, error) {
+		var (
+			body PostManualEdgeRequestBody
+			err  error
+		)
+		err = decoder(r).Decode(&body)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil, goa.MissingPayloadError()
+			}
+			var gerr *goa.ServiceError
+			if errors.As(err, &gerr) {
+				return nil, gerr
+			}
+			return nil, goa.DecodePayloadError(err.Error())
+		}
+		err = ValidatePostManualEdgeRequestBody(&body)
+		if err != nil {
+			return nil, err
+		}
+		payload := NewPostManualEdgeManualEdgeRequest(&body)
+
+		return payload, nil
+	}
+}
+
+// EncodePostManualEdgeError returns an encoder for errors returned by the
+// post_manual_edge graph endpoint.
+func EncodePostManualEdgeError(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder, formatter func(ctx context.Context, err error) goahttp.Statuser) func(context.Context, http.ResponseWriter, error) error {
+	encodeError := goahttp.ErrorEncoder(encoder, formatter)
+	return func(ctx context.Context, w http.ResponseWriter, v error) error {
+		var en goa.GoaErrorNamer
+		if !errors.As(v, &en) {
+			return encodeError(ctx, w, v)
+		}
+		switch en.GoaErrorName() {
+		case "bad_request":
+			var res graph.BadRequest
+			errors.As(v, &res)
+			enc := encoder(ctx, w)
+			body := res
+			w.Header().Set("goa-error", res.GoaErrorName())
+			w.WriteHeader(http.StatusBadRequest)
+			return enc.Encode(body)
+		default:
+			return encodeError(ctx, w, v)
+		}
+	}
+}
+
 // marshalGraphGraphNodeToGraphNodeResponseBody builds a value of type
 // *GraphNodeResponseBody from a value of type *graph.GraphNode.
 func marshalGraphGraphNodeToGraphNodeResponseBody(v *graph.GraphNode) *GraphNodeResponseBody {
@@ -125,6 +190,18 @@ func marshalGraphGraphEdgeToGraphEdgeResponseBody(v *graph.GraphEdge) *GraphEdge
 		From:     v.From,
 		To:       v.To,
 		Directed: v.Directed,
+		Manual:   v.Manual,
+	}
+
+	return res
+}
+
+// unmarshalNodeRefRequestBodyToGraphNodeRef builds a value of type
+// *graph.NodeRef from a value of type *NodeRefRequestBody.
+func unmarshalNodeRefRequestBodyToGraphNodeRef(v *NodeRefRequestBody) *graph.NodeRef {
+	res := &graph.NodeRef{
+		Type: *v.Type,
+		Key:  *v.Key,
 	}
 
 	return res

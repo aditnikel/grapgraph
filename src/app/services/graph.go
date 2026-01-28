@@ -13,29 +13,22 @@ type GraphService struct {
 }
 
 func (s *GraphService) GetMetadata(ctx context.Context) (*graph.MetadataResponse, error) {
-	ets := make([]string, 0, len(model.AllEventTypes()))
-	for _, e := range model.AllEventTypes() {
-		ets = append(ets, string(e))
+	meta, err := s.Graph.GetMetadata(ctx)
+	if err != nil {
+		return nil, graph.BadRequest(err.Error())
 	}
-
 	return &graph.MetadataResponse{
-		NodeTypes: []string{
-			string(model.NodeUser),
-			string(model.NodeMerchant),
-			string(model.NodeExchange),
-			string(model.NodeWallet),
-			string(model.NodePaymentMethod),
-			string(model.NodeBank),
-			string(model.NodeDevice),
-		},
-		EdgeTypes: ets,
+		NodeTypes: meta.NodeTypes,
+		EdgeTypes: meta.EdgeTypes,
 	}, nil
 }
 
 func (s *GraphService) PostSubgraph(ctx context.Context, p *graph.SubgraphRequest) (*graph.SubgraphResponse, error) {
 	req := model.SubgraphRequest{
-		Hops:      p.Hops,
-		EdgeTypes: p.EdgeTypes,
+		Hops:          p.Hops,
+		EdgeTypes:     p.EdgeTypes,
+		MinEventCount: p.MinEventCount,
+		TimeWindowMs:  p.TimeWindowMs,
 	}
 
 	req.Root.Type = p.Root.Type
@@ -68,6 +61,7 @@ func (s *GraphService) PostSubgraph(ctx context.Context, p *graph.SubgraphReques
 			From:     e.From,
 			To:       e.To,
 			Directed: e.Directed,
+			Manual:   e.Manual,
 		}
 	}
 
@@ -77,5 +71,29 @@ func (s *GraphService) PostSubgraph(ctx context.Context, p *graph.SubgraphReques
 		Nodes:     nodes,
 		Edges:     edges,
 		Truncated: resp.Truncated,
+	}, nil
+}
+
+func (s *GraphService) PostManualEdge(ctx context.Context, p *graph.ManualEdgeRequest) (*graph.GraphEdge, error) {
+	req := model.ManualEdgeRequest{
+		EdgeType: p.EdgeType,
+	}
+	req.From.Type = p.From.Type
+	req.From.Key = p.From.Key
+	req.To.Type = p.To.Type
+	req.To.Key = p.To.Key
+
+	edge, err := s.Graph.CreateManualEdge(ctx, req)
+	if err != nil {
+		return nil, graph.BadRequest(err.Error())
+	}
+
+	return &graph.GraphEdge{
+		ID:       edge.ID,
+		Type:     edge.Type,
+		From:     edge.From,
+		To:       edge.To,
+		Directed: edge.Directed,
+		Manual:   edge.Manual,
 	}, nil
 }

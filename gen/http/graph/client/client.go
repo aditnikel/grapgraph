@@ -25,6 +25,10 @@ type Client struct {
 	// post_subgraph endpoint.
 	PostSubgraphDoer goahttp.Doer
 
+	// PostManualEdge Doer is the HTTP client used to make requests to the
+	// post_manual_edge endpoint.
+	PostManualEdgeDoer goahttp.Doer
+
 	// RestoreResponseBody controls whether the response bodies are reset after
 	// decoding so they can be read again.
 	RestoreResponseBody bool
@@ -47,6 +51,7 @@ func NewClient(
 	return &Client{
 		GetMetadataDoer:     doer,
 		PostSubgraphDoer:    doer,
+		PostManualEdgeDoer:  doer,
 		RestoreResponseBody: restoreBody,
 		scheme:              scheme,
 		host:                host,
@@ -93,6 +98,30 @@ func (c *Client) PostSubgraph() goa.Endpoint {
 		resp, err := c.PostSubgraphDoer.Do(req)
 		if err != nil {
 			return nil, goahttp.ErrRequestError("graph", "post_subgraph", err)
+		}
+		return decodeResponse(resp)
+	}
+}
+
+// PostManualEdge returns an endpoint that makes HTTP requests to the graph
+// service post_manual_edge server.
+func (c *Client) PostManualEdge() goa.Endpoint {
+	var (
+		encodeRequest  = EncodePostManualEdgeRequest(c.encoder)
+		decodeResponse = DecodePostManualEdgeResponse(c.decoder, c.RestoreResponseBody)
+	)
+	return func(ctx context.Context, v any) (any, error) {
+		req, err := c.BuildPostManualEdgeRequest(ctx, v)
+		if err != nil {
+			return nil, err
+		}
+		err = encodeRequest(req, v)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := c.PostManualEdgeDoer.Do(req)
+		if err != nil {
+			return nil, goahttp.ErrRequestError("graph", "post_manual_edge", err)
 		}
 		return decodeResponse(resp)
 	}

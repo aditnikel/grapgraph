@@ -28,8 +28,8 @@ func UsageCommands() []string {
 	return []string{
 		"openapi (index|docs)",
 		"health get",
+		"graph (get-metadata|post-subgraph|post-manual-edge)",
 		"ingest post-event",
-		"graph (get-metadata|post-subgraph)",
 	}
 }
 
@@ -37,8 +37,8 @@ func UsageCommands() []string {
 func UsageExamples() string {
 	return os.Args[0] + " " + "openapi index" + "\n" +
 		os.Args[0] + " " + "health get" + "\n" +
-		os.Args[0] + " " + "ingest post-event --body '{\n      \"events\": [\n         {\n            \"event_timestamp\": \"2024-03-20T10:00:00Z\",\n            \"event_type\": \"PAYMENT\",\n            \"merchant_id_mpan\": \"m_7\",\n            \"total_transaction_amount\": 125,\n            \"user_id\": \"u_1\"\n         },\n         {\n            \"event_timestamp\": 1710930030000,\n            \"event_type\": \"LOGIN\",\n            \"user_id\": \"u_2\"\n         }\n      ]\n   }'" + "\n" +
 		os.Args[0] + " " + "graph get-metadata" + "\n" +
+		os.Args[0] + " " + "ingest post-event --body '{\n      \"events\": [\n         {\n            \"event_timestamp\": \"2024-03-20T10:00:00Z\",\n            \"event_type\": \"PAYMENT\",\n            \"merchant_id_mpan\": \"m_7\",\n            \"total_transaction_amount\": 125,\n            \"user_id\": \"u_1\"\n         },\n         {\n            \"event_timestamp\": 1710930030000,\n            \"event_type\": \"LOGIN\",\n            \"user_id\": \"u_2\"\n         }\n      ]\n   }'" + "\n" +
 		""
 }
 
@@ -62,17 +62,20 @@ func ParseEndpoint(
 
 		healthGetFlags = flag.NewFlagSet("get", flag.ExitOnError)
 
-		ingestFlags = flag.NewFlagSet("ingest", flag.ContinueOnError)
-
-		ingestPostEventFlags    = flag.NewFlagSet("post-event", flag.ExitOnError)
-		ingestPostEventBodyFlag = ingestPostEventFlags.String("body", "REQUIRED", "")
-
 		graphFlags = flag.NewFlagSet("graph", flag.ContinueOnError)
 
 		graphGetMetadataFlags = flag.NewFlagSet("get-metadata", flag.ExitOnError)
 
 		graphPostSubgraphFlags    = flag.NewFlagSet("post-subgraph", flag.ExitOnError)
 		graphPostSubgraphBodyFlag = graphPostSubgraphFlags.String("body", "REQUIRED", "")
+
+		graphPostManualEdgeFlags    = flag.NewFlagSet("post-manual-edge", flag.ExitOnError)
+		graphPostManualEdgeBodyFlag = graphPostManualEdgeFlags.String("body", "REQUIRED", "")
+
+		ingestFlags = flag.NewFlagSet("ingest", flag.ContinueOnError)
+
+		ingestPostEventFlags    = flag.NewFlagSet("post-event", flag.ExitOnError)
+		ingestPostEventBodyFlag = ingestPostEventFlags.String("body", "REQUIRED", "")
 	)
 	openapiFlags.Usage = openapiUsage
 	openapiIndexFlags.Usage = openapiIndexUsage
@@ -81,12 +84,13 @@ func ParseEndpoint(
 	healthFlags.Usage = healthUsage
 	healthGetFlags.Usage = healthGetUsage
 
-	ingestFlags.Usage = ingestUsage
-	ingestPostEventFlags.Usage = ingestPostEventUsage
-
 	graphFlags.Usage = graphUsage
 	graphGetMetadataFlags.Usage = graphGetMetadataUsage
 	graphPostSubgraphFlags.Usage = graphPostSubgraphUsage
+	graphPostManualEdgeFlags.Usage = graphPostManualEdgeUsage
+
+	ingestFlags.Usage = ingestUsage
+	ingestPostEventFlags.Usage = ingestPostEventUsage
 
 	if err := flag.CommandLine.Parse(os.Args[1:]); err != nil {
 		return nil, nil, err
@@ -107,10 +111,10 @@ func ParseEndpoint(
 			svcf = openapiFlags
 		case "health":
 			svcf = healthFlags
-		case "ingest":
-			svcf = ingestFlags
 		case "graph":
 			svcf = graphFlags
+		case "ingest":
+			svcf = ingestFlags
 		default:
 			return nil, nil, fmt.Errorf("unknown service %q", svcn)
 		}
@@ -143,13 +147,6 @@ func ParseEndpoint(
 
 			}
 
-		case "ingest":
-			switch epn {
-			case "post-event":
-				epf = ingestPostEventFlags
-
-			}
-
 		case "graph":
 			switch epn {
 			case "get-metadata":
@@ -157,6 +154,16 @@ func ParseEndpoint(
 
 			case "post-subgraph":
 				epf = graphPostSubgraphFlags
+
+			case "post-manual-edge":
+				epf = graphPostManualEdgeFlags
+
+			}
+
+		case "ingest":
+			switch epn {
+			case "post-event":
+				epf = ingestPostEventFlags
 
 			}
 
@@ -194,13 +201,6 @@ func ParseEndpoint(
 			case "get":
 				endpoint = c.Get()
 			}
-		case "ingest":
-			c := ingestc.NewClient(scheme, host, doer, enc, dec, restore)
-			switch epn {
-			case "post-event":
-				endpoint = c.PostEvent()
-				data, err = ingestc.BuildPostEventPayload(*ingestPostEventBodyFlag)
-			}
 		case "graph":
 			c := graphc.NewClient(scheme, host, doer, enc, dec, restore)
 			switch epn {
@@ -209,6 +209,16 @@ func ParseEndpoint(
 			case "post-subgraph":
 				endpoint = c.PostSubgraph()
 				data, err = graphc.BuildPostSubgraphPayload(*graphPostSubgraphBodyFlag)
+			case "post-manual-edge":
+				endpoint = c.PostManualEdge()
+				data, err = graphc.BuildPostManualEdgePayload(*graphPostManualEdgeBodyFlag)
+			}
+		case "ingest":
+			c := ingestc.NewClient(scheme, host, doer, enc, dec, restore)
+			switch epn {
+			case "post-event":
+				endpoint = c.PostEvent()
+				data, err = ingestc.BuildPostEventPayload(*ingestPostEventBodyFlag)
 			}
 		}
 	}
@@ -288,34 +298,6 @@ func healthGetUsage() {
 	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "health get")
 }
 
-// ingestUsage displays the usage of the ingest command and its subcommands.
-func ingestUsage() {
-	fmt.Fprintln(os.Stderr, `High-speed financial event ingestion service.`)
-	fmt.Fprintf(os.Stderr, "Usage:\n    %s [globalflags] ingest COMMAND [flags]\n\n", os.Args[0])
-	fmt.Fprintln(os.Stderr, "COMMAND:")
-	fmt.Fprintln(os.Stderr, `    post-event: Accepts one or more financial events (Payment, Login, etc.) and updates the relationship graph.`)
-	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, "Additional help:")
-	fmt.Fprintf(os.Stderr, "    %s ingest COMMAND --help\n", os.Args[0])
-}
-func ingestPostEventUsage() {
-	// Header with flags
-	fmt.Fprintf(os.Stderr, "%s [flags] ingest post-event", os.Args[0])
-	fmt.Fprint(os.Stderr, " -body JSON")
-	fmt.Fprintln(os.Stderr)
-
-	// Description
-	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, `Accepts one or more financial events (Payment, Login, etc.) and updates the relationship graph.`)
-
-	// Flags list
-	fmt.Fprintln(os.Stderr, `    -body JSON: `)
-
-	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, "Example:")
-	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "ingest post-event --body '{\n      \"events\": [\n         {\n            \"event_timestamp\": \"2024-03-20T10:00:00Z\",\n            \"event_type\": \"PAYMENT\",\n            \"merchant_id_mpan\": \"m_7\",\n            \"total_transaction_amount\": 125,\n            \"user_id\": \"u_1\"\n         },\n         {\n            \"event_timestamp\": 1710930030000,\n            \"event_type\": \"LOGIN\",\n            \"user_id\": \"u_2\"\n         }\n      ]\n   }'")
-}
-
 // graphUsage displays the usage of the graph command and its subcommands.
 func graphUsage() {
 	fmt.Fprintln(os.Stderr, `Graph traversal service for fraud pattern analysis and subgraph extraction.`)
@@ -323,6 +305,7 @@ func graphUsage() {
 	fmt.Fprintln(os.Stderr, "COMMAND:")
 	fmt.Fprintln(os.Stderr, `    get-metadata: Returns valid node types, edge types, and supported ranking metrics.`)
 	fmt.Fprintln(os.Stderr, `    post-subgraph: Extracts a surrounding subgraph for a specific root node using multi-hop analysis.`)
+	fmt.Fprintln(os.Stderr, `    post-manual-edge: Creates a manual relationship between two nodes.`)
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Additional help:")
 	fmt.Fprintf(os.Stderr, "    %s graph COMMAND --help\n", os.Args[0])
@@ -358,5 +341,51 @@ func graphPostSubgraphUsage() {
 
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
-	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "graph post-subgraph --body '{\n      \"edge_types\": [\n         \"PAYMENT\",\n         \"LOGIN\"\n      ],\n      \"hops\": 2,\n      \"limit\": {\n         \"max_edges\": 100,\n         \"max_nodes\": 50\n      },\n      \"root\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      }\n   }'")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "graph post-subgraph --body '{\n      \"edge_types\": [\n         \"PAYMENT\",\n         \"LOGIN\"\n      ],\n      \"hops\": 2,\n      \"limit\": {\n         \"max_edges\": 100,\n         \"max_nodes\": 50\n      },\n      \"min_event_count\": 2,\n      \"root\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      },\n      \"time_window_ms\": 2592000000\n   }'")
+}
+
+func graphPostManualEdgeUsage() {
+	// Header with flags
+	fmt.Fprintf(os.Stderr, "%s [flags] graph post-manual-edge", os.Args[0])
+	fmt.Fprint(os.Stderr, " -body JSON")
+	fmt.Fprintln(os.Stderr)
+
+	// Description
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, `Creates a manual relationship between two nodes.`)
+
+	// Flags list
+	fmt.Fprintln(os.Stderr, `    -body JSON: `)
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Example:")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "graph post-manual-edge --body '{\n      \"edge_type\": \"MANUAL\",\n      \"from\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      },\n      \"to\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      }\n   }'")
+}
+
+// ingestUsage displays the usage of the ingest command and its subcommands.
+func ingestUsage() {
+	fmt.Fprintln(os.Stderr, `High-speed financial event ingestion service.`)
+	fmt.Fprintf(os.Stderr, "Usage:\n    %s [globalflags] ingest COMMAND [flags]\n\n", os.Args[0])
+	fmt.Fprintln(os.Stderr, "COMMAND:")
+	fmt.Fprintln(os.Stderr, `    post-event: Accepts one or more financial events (Payment, Login, etc.) and updates the relationship graph.`)
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Additional help:")
+	fmt.Fprintf(os.Stderr, "    %s ingest COMMAND --help\n", os.Args[0])
+}
+func ingestPostEventUsage() {
+	// Header with flags
+	fmt.Fprintf(os.Stderr, "%s [flags] ingest post-event", os.Args[0])
+	fmt.Fprint(os.Stderr, " -body JSON")
+	fmt.Fprintln(os.Stderr)
+
+	// Description
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, `Accepts one or more financial events (Payment, Login, etc.) and updates the relationship graph.`)
+
+	// Flags list
+	fmt.Fprintln(os.Stderr, `    -body JSON: `)
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Example:")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "ingest post-event --body '{\n      \"events\": [\n         {\n            \"event_timestamp\": \"2024-03-20T10:00:00Z\",\n            \"event_type\": \"PAYMENT\",\n            \"merchant_id_mpan\": \"m_7\",\n            \"total_transaction_amount\": 125,\n            \"user_id\": \"u_1\"\n         },\n         {\n            \"event_timestamp\": 1710930030000,\n            \"event_type\": \"LOGIN\",\n            \"user_id\": \"u_2\"\n         }\n      ]\n   }'")
 }
