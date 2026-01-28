@@ -1,4 +1,4 @@
-package service
+package domain
 
 import (
 	"context"
@@ -33,4 +33,15 @@ func (s *IngestService) AcceptEvent(ctx context.Context, ev model.CustomerEvent)
 	}
 
 	return s.Repo.UpsertAggregated(ctx, ev, et, label, keyProp, keyValue, tsMillis, ev.TotalAmount)
+}
+
+func (s *IngestService) AcceptEvents(ctx context.Context, events []model.CustomerEvent) (int, error) {
+	accepted := 0
+	for idx, ev := range events {
+		if err := s.AcceptEvent(ctx, ev); err != nil {
+			return accepted, fmt.Errorf("event[%d]: %w", idx, err)
+		}
+		accepted++
+	}
+	return accepted, nil
 }

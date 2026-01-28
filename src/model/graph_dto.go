@@ -9,10 +9,9 @@ type GraphNode struct {
 }
 
 type GraphEdge struct {
-	ID       string         `json:"id"`
-	Type     string         `json:"type"`
-	From     string         `json:"from"`
-	To       string         `json:"to"`
-	Directed bool           `json:"directed"`
-	Metrics  map[string]any `json:"metrics,omitempty"`
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	From     string `json:"from"`
+	To       string `json:"to"`
+	Directed bool   `json:"directed"`
 }

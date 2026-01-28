@@ -8,14 +8,7 @@ type SubgraphRequest struct {
 
 	Hops int `json:"hops"`
 
-	TimeWindow struct {
-		From string `json:"from"`
-		To   string `json:"to"`
-	} `json:"time_window"`
-
-	EdgeTypes       []string `json:"edge_types"`
-	MinEventCount   int      `json:"min_event_count"`
-	RankNeighborsBy string   `json:"rank_neighbors_by"`
+	EdgeTypes []string `json:"edge_types"`
 
 	Limit struct {
 		MaxNodes int `json:"max_nodes"`

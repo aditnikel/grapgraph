@@ -27,22 +27,12 @@ END
 const UserToEntityTemplate = `
 MATCH (u:User {user_id:$user_id})-[r]->(n)
 WHERE type(r) IN [%s]
-  AND r.%s >= $min_count
-  AND r.last_seen >= $from_ts AND r.last_seen <= $to_ts
 RETURN
   'USER' AS from_type,
   u.user_id AS from_key,
   ` + NodeTypeCase + ` AS to_type,
   ` + NodeKeyCase + ` AS to_key,
-  type(r) AS edge_type,
-  coalesce(r.event_count, 0) AS event_count,
-  coalesce(r.event_count_30d, 0) AS event_count_30d,
-  coalesce(r.distinct_ip_count_30d, 0) AS distinct_ip_count_30d,
-  coalesce(r.first_seen, 0) AS first_seen,
-  coalesce(r.last_seen, 0) AS last_seen,
-  coalesce(r.total_amount, 0.0) AS total_amount,
-  coalesce(r.max_amount, 0.0) AS max_amount
-ORDER BY r.%s DESC
+  type(r) AS edge_type
 LIMIT $limit
 `
 
@@ -50,23 +40,13 @@ const EntityToUserTemplate = `
 MATCH (n)<-[r]-(u:User)
 WHERE id(n) = $entity_id
   AND type(r) IN [%s]
-  AND r.%s >= $min_count
-  AND r.last_seen >= $from_ts AND r.last_seen <= $to_ts
 RETURN
   ` + NodeTypeCase + ` AS from_type,
   ` + NodeKeyCase + ` AS from_key,
   'USER' AS to_type,
   u.user_id AS to_key,
   type(r) AS edge_type,
-  coalesce(r.event_count, 0) AS event_count,
-  coalesce(r.event_count_30d, 0) AS event_count_30d,
-  coalesce(r.distinct_ip_count_30d, 0) AS distinct_ip_count_30d,
-  coalesce(r.first_seen, 0) AS first_seen,
-  coalesce(r.last_seen, 0) AS last_seen,
-  coalesce(r.total_amount, 0.0) AS total_amount,
-  coalesce(r.max_amount, 0.0) AS max_amount,
   id(u) AS user_internal_id
-ORDER BY r.%s DESC
 LIMIT $limit
 `
 

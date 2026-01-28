@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Grapgraph — Fraud Analysis Canvas</title>
+  <link rel="shortcut icon" href="#">
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    :root {
+      --bg: #030712;
+      --panel-bg: rgba(17, 24, 39, 0.7);
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #f9fafb;
+      --text-muted: #9ca3af;
+      --primary: #6366f1;
+      --accent: #f59e0b;
+      --glass: blur(12px) saturate(180%);
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* Topbar styling */
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 20px;
+      background: var(--panel-bg);
+      backdrop-filter: var(--glass);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .topbar strong {
+      font-size: 18px;
+      background: linear-gradient(to right, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-right: 12px;
+    }
+
+    .topbar label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); }
+    
+    .topbar input, .topbar select {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      color: var(--text);
+      font-size: 13px;
+      transition: border-color 0.2s;
+    }
+
+    .topbar input:focus { border-color: var(--primary); outline: none; }
+
+    .topbar button {
+      padding: 8px 16px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: transform 0.1s, filter 0.2s;
+    }
+
+    .topbar button:hover { filter: brightness(1.1); }
+    .topbar button:active { transform: scale(0.98); }
+    .topbar button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    /* Main Chart Area */
+    #chart { width: 100vw; height: calc(100vh - 68px); background: radial-gradient(circle at center, #111827 0%, #030712 100%); }
+
+    /* Floating Panel */
+    .panel {
+      position: fixed;
+      right: 20px;
+      top: 86px;
+      width: 320px;
+      max-height: calc(100vh - 120px);
+      overflow-y: auto;
+      background: var(--panel-bg);
+      backdrop-filter: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+      padding: 20px;
+      z-index: 50;
+    }
+
+    .panel h3 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .panel .section { margin-bottom: 24px; }
+    .panel .row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+
+    /* Legend & KPI */
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 6px;
+      font-size: 11px;
+    }
+    .swatch { width: 10px; height: 10px; border-radius: 2px; }
+
+    .kpi { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+    .kpi .box {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+    }
+    .kpi .box .k { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .kpi .box .v { font-size: 18px; font-weight: 700; margin-top: 4px; }
+
+    /* Tooltip */
+    .tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+      display: none;
+      min-width: 200px;
+    }
+
+    /* Toasts */
+    #toast-container { position: fixed; bottom: 24px; left: 24px; z-index: 10000; display: flex; flex-direction: column; gap: 8px; }
+    .toast {
+      background: #1f2937;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 8px;
+      border-left: 4px solid var(--primary);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      font-size: 13px;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* Icons and Nodes */
+    .node-icon { font-size: 14px; pointer-events: none; }
+  </style>
+</head>
+<body>
+
+  <div id="toast-container"></div>
+
+  <div class="topbar">
+    <strong>Grapgraph</strong>
+
+    <div style="display:flex; flex-direction:column; gap:2px;">
+      <label>User ID</label>
+      <input id="userId" placeholder="u_123" value="u_123" list="user-suggestions" />
+      <datalist id="user-suggestions"></datalist>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:2px;">
+      <label>Hops</label>
+      <select id="hops">
+        <option>1</option><option selected>2</option><option>3</option>
+      </select>
+    </div>
+
+    <button id="loadBtn">Visualize</button>
+
+    <div style="display:flex; gap:8px; margin-left: auto;">
+      <span class="pill">
+        <input id="clusterByType" type="checkbox" />
+        <label for="clusterByType" style="margin:0; cursor:pointer;">Cluster</label>
+      </span>
+      <span class="pill">
+        <input id="showLabels" type="checkbox" checked />
+        <label for="showLabels" style="margin:0; cursor:pointer;">Labels</label>
+      </span>
+    </div>
+  </div>
+
+  <div id="chart"></div>
+  <div id="tip" class="tooltip"></div>
+
+  <div class="panel">
+    <div class="section">
+      <h3>Edge Filters</h3>
+      <div id="edgeFilters"></div>
+    </div>
+
+    <div class="section">
+      <h3>Search Node</h3>
+      <div class="row">
+        <input id="searchId" placeholder="e.g. u_123" style="width: 100%;" />
+      </div>
+      <button id="focusBtn" style="width: 100%; background:rgba(255,255,255,0.1); color:white; margin-top:8px;">Focus</button>
+    </div>
+
+    <div class="section">
+      <h3>Network KPIs</h3>
+      <div class="kpi">
+        <div class="box"><div class="k">Nodes</div><div class="v" id="kpiNodes">0</div></div>
+        <div class="box"><div class="k">Edges</div><div class="v" id="kpiEdges">0</div></div>
+      </div>
+      <div id="trunc-warning" style="color:var(--accent); font-size:11px; margin-top:10px; display:none;">⚠️ Result truncated by budget</div>
+    </div>
+
+    <div class="section">
+      <h3>Legend</h3>
+      <div class="legend" id="nodeLegend"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:8080";
+    const $ = (id) => document.getElementById(id);
+
+    const NODE_METADATA = {
+      "USER": { color: "#818cf8", icon: "👤" },
+      "MERCHANT": { color: "#f87171", icon: "🏪" },
+      "DEVICE": { color: "#34d399", icon: "📱" },
+      "WALLET": { color: "#fbbf24", icon: "👛" },
+      "EXCHANGE": { color: "#fb7185", icon: "💱" },
+      "PAYMENT_METHOD": { color: "#60a5fa", icon: "💳" },
+      "BANK": { color: "#a78bfa", icon: "🏦" },
+      "UNKNOWN": { color: "#6b7280", icon: "❓" }
+    };
+
+    let ALL_EVENT_TYPES = [];
+    const ui = { enabledEdgeTypes: new Set() };
+    const store = { nodes: new Map(), links: new Map(), truncated: false };
+    const suggestions = new Set(["u_123", "u_555", "u_999", "u_001", "u_bot_1", "u_mule_1"]);
+
+    let svg, g, simulation, linkSel, nodeSel, labelSel, width, height;
+
+    // --- Utilities ---
+    function toast(msg, type = "info") {
+      const container = $("toast-container");
+      const div = document.createElement("div");
+      div.className = "toast";
+      div.textContent = msg;
+      if (type === "error") div.style.borderLeftColor = "#ef4444";
+      container.appendChild(div);
+      setTimeout(() => div.remove(), 4000);
+    }
+
+    const edgeColorScale = d3.scaleOrdinal(d3.schemeTableau10);
+
+    // --- Initialization ---
+    async function initMetadata() {
+      try {
+        const res = await fetch(`${API_BASE}/v1/graph/metadata`);
+        const data = await res.json();
+        ALL_EVENT_TYPES = data.edge_types || [];
+        ui.enabledEdgeTypes = new Set(ALL_EVENT_TYPES);
+        buildEdgeFilters();
+        buildNodeLegend(data.node_types);
+        updateSuggestions();
+      } catch (err) {
+        toast("Failed to fetch metadata. Check if API is running.", "error");
+      }
+    }
+
+    function updateSuggestions() {
+      const list = $("user-suggestions");
+      list.innerHTML = "";
+      suggestions.forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s;
+        list.appendChild(opt);
+      });
+    }
+
+    function buildEdgeFilters() {
+      const container = $("edgeFilters");
+      container.innerHTML = "";
+      ALL_EVENT_TYPES.forEach(et => {
+        const row = document.createElement("div");
+        row.className = "row";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = true;
+        cb.onchange = (e) => {
+          if (e.target.checked) ui.enabledEdgeTypes.add(et);
+          else ui.enabledEdgeTypes.delete(et);
+          refreshGraph();
+        };
+        const dot = document.createElement("span"); 
+        dot.className = "swatch"; 
+        dot.style.background = edgeColorScale(et);
+        const lbl = document.createElement("label"); 
+        lbl.textContent = et.toLowerCase().replace("_", " ");
+        lbl.style.fontSize = "12px";
+        row.append(cb, dot, lbl);
+        container.appendChild(row);
+      });
+    }
+
+    function buildNodeLegend(types) {
+      const container = $("nodeLegend");
+      container.innerHTML = "";
+      (types || Object.keys(NODE_METADATA)).forEach(t => {
+        const meta = NODE_METADATA[t] || NODE_METADATA.UNKNOWN;
+        const item = document.createElement("div");
+        item.className = "legend-item";
+        item.innerHTML = `<span class="swatch" style="background:${meta.color}"></span><span>${meta.icon} ${t}</span>`;
+        container.appendChild(item);
+      });
+    }
+
+    // --- Graph Logic ---
+    function initSVG() {
+      const el = $("chart");
+      el.innerHTML = "";
+      width = el.clientWidth;
+      height = el.clientHeight;
+      svg = d3.select("#chart").append("svg").attr("width", width).attr("height", height);
+      
+      // Arrows
+      svg.append("defs").selectAll("marker")
+        .data(["end"])
+        .join("marker")
+        .attr("id", d => d)
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 25)
+        .attr("refY", 0)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("fill", "#6b7280")
+        .attr("d", "M0,-5L10,0L0,5");
+
+      g = svg.append("g");
+      svg.call(d3.zoom().scaleExtent([0.1, 8]).on("zoom", (e) => g.attr("transform", e.transform)));
+    }
+
+    function refreshGraph() {
+      const nodes = Array.from(store.nodes.values());
+      const links = Array.from(store.links.values()).filter(l => ui.enabledEdgeTypes.has(l.type));
+      
+      const usedNodes = new Set();
+      links.forEach(l => { usedNodes.add(l.source.id || l.source); usedNodes.add(l.target.id || l.target); });
+      const filteredNodes = nodes.filter(n => usedNodes.has(n.id) || n.id.includes($("userId").value));
+
+      render(filteredNodes, links);
+      $("kpiNodes").textContent = filteredNodes.length;
+      $("kpiEdges").textContent = links.length;
+      $("trunc-warning").style.display = store.truncated ? "block" : "none";
+    }
+
+    function render(nodes, links) {
+      initSVG();
+      
+      simulation = d3.forceSimulation(nodes)
+        .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+        .force("charge", d3.forceManyBody().strength(-300))
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .force("collide", d3.forceCollide().radius(30));
+
+      if ($("clusterByType").checked) {
+        simulation.force("x", d3.forceX(width / 2).strength(0.1)).force("y", d3.forceY(height / 2).strength(0.1));
+      }
+
+      linkSel = g.append("g")
+        .selectAll("line")
+        .data(links)
+        .join("line")
+        .attr("stroke", d => edgeColorScale(d.type))
+        .attr("stroke-width", 2)
+        .attr("stroke-opacity", 0.4)
+        .attr("marker-end", "url(#end)")
+        .on("mouseenter", (e, d) => showTip(e, `<b>${d.type}</b>`))
+        .on("mouseleave", hideTip);
+
+      nodeSel = g.append("g")
+        .selectAll("g")
+        .data(nodes)
+        .join("g")
+        .call(d3.drag().on("start", (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+                      .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; })
+                      .on("end", (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }))
+        .on("click", (e, d) => {
+          if (e.shiftKey && d.type === "USER") expandUser(d.key);
+          else focusNode(d.id);
+        })
+        .on("mouseenter", (e, d) => showTip(e, `<b>${d.label}</b><br>ID: ${d.id}<br>Type: ${d.type}`))
+        .on("mouseleave", hideTip);
+
+      nodeSel.append("circle")
+        .attr("r", d => d.type === "USER" ? 18 : 12)
+        .attr("fill", d => (NODE_METADATA[d.type] || NODE_METADATA.UNKNOWN).color)
+        .attr("stroke", "rgba(255,255,255,0.2)")
+        .attr("stroke-width", 2);
+
+      nodeSel.append("text")
+        .attr("class", "node-icon")
+        .attr("text-anchor", "middle")
+        .attr("dy", "0.35em")
+        .text(d => (NODE_METADATA[d.type] || NODE_METADATA.UNKNOWN).icon);
+
+      labelSel = g.append("g")
+        .selectAll("text")
+        .data(nodes)
+        .join("text")
+        .text(d => d.key.length > 12 ? d.key.substring(0, 10) + ".." : d.key)
+        .attr("fill", "var(--text-muted)")
+        .attr("font-size", "10px")
+        .attr("text-anchor", "middle")
+        .attr("dy", d => d.type === "USER" ? 32 : 26)
+        .style("display", $("showLabels").checked ? "block" : "none");
+
+      simulation.on("tick", () => {
+        linkSel.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+               .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+        nodeSel.attr("transform", d => `translate(${d.x},${d.y})`);
+        labelSel.attr("x", d => d.x).attr("y", d => d.y);
+      });
+    }
+
+    function showTip(e, html) {
+      const tip = $("tip");
+      tip.innerHTML = html;
+      tip.style.display = "block";
+      tip.style.left = (e.clientX + 15) + "px";
+      tip.style.top = (e.clientY + 15) + "px";
+    }
+    function hideTip() { $("tip").style.display = "none"; }
+
+    function focusNode(id) {
+      const neighbors = new Set([id]);
+      store.links.forEach(l => {
+        const s = l.source.id || l.source;
+        const t = l.target.id || l.target;
+        if (s === id) neighbors.add(t);
+        if (t === id) neighbors.add(s);
+      });
+      nodeSel.attr("opacity", d => neighbors.has(d.id) ? 1 : 0.1);
+      linkSel.attr("stroke-opacity", d => (neighbors.has(d.source.id || d.source) && neighbors.has(d.target.id || d.target)) ? 1 : 0.05);
+    }
+
+    // --- Data Ingestion ---
+    async function loadGraph() {
+      const userId = $("userId").value.trim();
+      if (!userId) return toast("Enter a User ID", "error");
+      
+      const btn = $("loadBtn");
+      btn.disabled = true;
+      btn.textContent = "Loading...";
+      
+      try {
+        const body = {
+          root: { type: "USER", key: userId },
+          hops: parseInt($("hops").value),
+          limit: { max_nodes: 100, max_edges: 200 }
+        };
+
+        const res = await fetch(`${API_BASE}/v1/graph/subgraph`, {
+          method: "POST", 
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        
+        store.nodes.clear();
+        store.links.clear();
+        suggestions.add(userId);
+        updateSuggestions();
+        
+        processResponse(data);
+        refreshGraph();
+        toast(`Loaded ${data.nodes.length} nodes and ${data.edges.length} edges`);
+      } catch (err) {
+        toast(`Load failed: ${err.message}`, "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Visualize";
+      }
+    }
+
+    async function expandUser(key) {
+      toast(`Expanding user ${key}...`);
+      try {
+        const body = {
+          root: { type: "USER", key: key },
+          hops: 1,
+          limit: { max_nodes: 50, max_edges: 100 }
+        };
+        const res = await fetch(`${API_BASE}/v1/graph/subgraph`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const data = await res.json();
+        processResponse(data);
+        refreshGraph();
+      } catch (err) { toast("Expansion failed", "error"); }
+    }
+
+    function processResponse(data) {
+      data.nodes.forEach(n => store.nodes.set(n.id, n));
+      data.edges.forEach(e => {
+        const eid = `${e.from}-${e.to}-${e.type}`;
+        store.links.set(eid, { ...e, source: e.from, target: e.to });
+      });
+      store.truncated = data.truncated;
+    }
+
+    // --- Events ---
+    $("loadBtn").onclick = loadGraph;
+    $("focusBtn").onclick = () => focusNode($("searchId").value.trim());
+    window.onresize = refreshGraph;
+    $("showLabels").onchange = (e) => { if (labelSel) labelSel.style("display", e.target.checked ? "block" : "none"); };
+    $("clusterByType").onchange = refreshGraph;
+
+    // --- Boot ---
+    initMetadata();
+  </script>
+</body>
+</html>

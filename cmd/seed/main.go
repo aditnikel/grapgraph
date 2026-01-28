@@ -10,6 +10,7 @@ import (
 	"github.com/redis/rueidis"
 
 	"github.com/aditnikel/grapgraph/src/config"
+	"github.com/aditnikel/grapgraph/src/domain"
 	"github.com/aditnikel/grapgraph/src/graph"
 	"github.com/aditnikel/grapgraph/src/seed"
 )
@@ -45,7 +46,8 @@ func main() {
 
 	repo.EnsureSchema(ctx)
 
-	if err := seed.SeedDemo(ctx, repo); err != nil {
+	ingestSvc := &domain.IngestService{Repo: repo}
+	if err := seed.SeedDemo(ctx, ingestSvc); err != nil {
 		log.Fatal(err)
 	}
 
