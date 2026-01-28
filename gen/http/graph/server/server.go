@@ -18,9 +18,10 @@ import (
 
 // Server lists the graph service endpoint HTTP handlers.
 type Server struct {
-	Mounts       []*MountPoint
-	GetMetadata  http.Handler
-	PostSubgraph http.Handler
+	Mounts         []*MountPoint
+	GetMetadata    http.Handler
+	PostSubgraph   http.Handler
+	PostManualEdge http.Handler
 }
 
 // MountPoint holds information about the mounted endpoints.
@@ -52,9 +53,11 @@ func New(
 		Mounts: []*MountPoint{
 			{"GetMetadata", "GET", "/v1/graph/metadata"},
 			{"PostSubgraph", "POST", "/v1/graph/subgraph"},
+			{"PostManualEdge", "POST", "/v1/graph/edge"},
 		},
-		GetMetadata:  NewGetMetadataHandler(e.GetMetadata, mux, decoder, encoder, errhandler, formatter),
-		PostSubgraph: NewPostSubgraphHandler(e.PostSubgraph, mux, decoder, encoder, errhandler, formatter),
+		GetMetadata:    NewGetMetadataHandler(e.GetMetadata, mux, decoder, encoder, errhandler, formatter),
+		PostSubgraph:   NewPostSubgraphHandler(e.PostSubgraph, mux, decoder, encoder, errhandler, formatter),
+		PostManualEdge: NewPostManualEdgeHandler(e.PostManualEdge, mux, decoder, encoder, errhandler, formatter),
 	}
 }
 
@@ -65,6 +68,7 @@ func (s *Server) Service() string { return "graph" }
 func (s *Server) Use(m func(http.Handler) http.Handler) {
 	s.GetMetadata = m(s.GetMetadata)
 	s.PostSubgraph = m(s.PostSubgraph)
+	s.PostManualEdge = m(s.PostManualEdge)
 }
 
 // MethodNames returns the methods served.
@@ -74,6 +78,7 @@ func (s *Server) MethodNames() []string { return graph.MethodNames[:] }
 func Mount(mux goahttp.Muxer, h *Server) {
 	MountGetMetadataHandler(mux, h.GetMetadata)
 	MountPostSubgraphHandler(mux, h.PostSubgraph)
+	MountPostManualEdgeHandler(mux, h.PostManualEdge)
 }
 
 // Mount configures the mux to serve the graph endpoints.
@@ -157,6 +162,59 @@ func NewPostSubgraphHandler(
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
 		ctx = context.WithValue(ctx, goa.MethodKey, "post_subgraph")
+		ctx = context.WithValue(ctx, goa.ServiceKey, "graph")
+		payload, err := decodeRequest(r)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		res, err := endpoint(ctx, payload)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		if err := encodeResponse(ctx, w, res); err != nil {
+			if errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+		}
+	})
+}
+
+// MountPostManualEdgeHandler configures the mux to serve the "graph" service
+// "post_manual_edge" endpoint.
+func MountPostManualEdgeHandler(mux goahttp.Muxer, h http.Handler) {
+	f, ok := h.(http.HandlerFunc)
+	if !ok {
+		f = func(w http.ResponseWriter, r *http.Request) {
+			h.ServeHTTP(w, r)
+		}
+	}
+	mux.Handle("POST", "/v1/graph/edge", f)
+}
+
+// NewPostManualEdgeHandler creates a HTTP handler which loads the HTTP request
+// and calls the "graph" service "post_manual_edge" endpoint.
+func NewPostManualEdgeHandler(
+	endpoint goa.Endpoint,
+	mux goahttp.Muxer,
+	decoder func(*http.Request) goahttp.Decoder,
+	encoder func(context.Context, http.ResponseWriter) goahttp.Encoder,
+	errhandler func(context.Context, http.ResponseWriter, error),
+	formatter func(ctx context.Context, err error) goahttp.Statuser,
+) http.Handler {
+	var (
+		decodeRequest  = DecodePostManualEdgeRequest(mux, decoder)
+		encodeResponse = EncodePostManualEdgeResponse(encoder)
+		encodeError    = EncodePostManualEdgeError(encoder, formatter)
+	)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
+		ctx = context.WithValue(ctx, goa.MethodKey, "post_manual_edge")
 		ctx = context.WithValue(ctx, goa.ServiceKey, "graph")
 		payload, err := decodeRequest(r)
 		if err != nil {

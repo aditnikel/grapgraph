@@ -18,6 +18,8 @@ type Service interface {
 	// Extracts a surrounding subgraph for a specific root node using multi-hop
 	// analysis.
 	PostSubgraph(context.Context, *SubgraphRequest) (res *SubgraphResponse, err error)
+	// Creates a manual relationship between two nodes.
+	PostManualEdge(context.Context, *ManualEdgeRequest) (res *GraphEdge, err error)
 }
 
 // APIName is the name of the API as defined in the design.
@@ -34,9 +36,9 @@ const ServiceName = "graph"
 // MethodNames lists the service method names as defined in the design. These
 // are the same values that are set in the endpoint request contexts under the
 // MethodKey key.
-var MethodNames = [2]string{"get_metadata", "post_subgraph"}
+var MethodNames = [3]string{"get_metadata", "post_subgraph", "post_manual_edge"}
 
-// A relationship between two entities.
+// GraphEdge is the result type of the graph service post_manual_edge method.
 type GraphEdge struct {
 	// Unique ID for the specific relationship.
 	ID string
@@ -48,6 +50,8 @@ type GraphEdge struct {
 	To string
 	// Whether the relationship has a specific flow direction.
 	Directed bool
+	// Whether the relationship was manually added.
+	Manual bool
 }
 
 // A single entity (User, Merchant, Device) in the resulting subgraph.
@@ -64,12 +68,31 @@ type GraphNode struct {
 	Props map[string]any
 }
 
+// ManualEdgeRequest is the payload type of the graph service post_manual_edge
+// method.
+type ManualEdgeRequest struct {
+	// Source node.
+	From *NodeRef
+	// Target node.
+	To *NodeRef
+	// Relationship type (e.g. PAYMENT, MANUAL).
+	EdgeType string
+}
+
 // MetadataResponse is the result type of the graph service get_metadata method.
 type MetadataResponse struct {
 	// All valid entity types.
 	NodeTypes []string
 	// All valid event types.
 	EdgeTypes []string
+}
+
+// A reference to a specific node in the graph.
+type NodeRef struct {
+	// Type of the node.
+	Type string
+	// The unique key of the node.
+	Key string
 }
 
 // SubgraphRequest is the payload type of the graph service post_subgraph

@@ -15,15 +15,17 @@ import (
 
 // Endpoints wraps the "graph" service endpoints.
 type Endpoints struct {
-	GetMetadata  goa.Endpoint
-	PostSubgraph goa.Endpoint
+	GetMetadata    goa.Endpoint
+	PostSubgraph   goa.Endpoint
+	PostManualEdge goa.Endpoint
 }
 
 // NewEndpoints wraps the methods of the "graph" service with endpoints.
 func NewEndpoints(s Service) *Endpoints {
 	return &Endpoints{
-		GetMetadata:  NewGetMetadataEndpoint(s),
-		PostSubgraph: NewPostSubgraphEndpoint(s),
+		GetMetadata:    NewGetMetadataEndpoint(s),
+		PostSubgraph:   NewPostSubgraphEndpoint(s),
+		PostManualEdge: NewPostManualEdgeEndpoint(s),
 	}
 }
 
@@ -31,6 +33,7 @@ func NewEndpoints(s Service) *Endpoints {
 func (e *Endpoints) Use(m func(goa.Endpoint) goa.Endpoint) {
 	e.GetMetadata = m(e.GetMetadata)
 	e.PostSubgraph = m(e.PostSubgraph)
+	e.PostManualEdge = m(e.PostManualEdge)
 }
 
 // NewGetMetadataEndpoint returns an endpoint function that calls the method
@@ -47,5 +50,14 @@ func NewPostSubgraphEndpoint(s Service) goa.Endpoint {
 	return func(ctx context.Context, req any) (any, error) {
 		p := req.(*SubgraphRequest)
 		return s.PostSubgraph(ctx, p)
+	}
+}
+
+// NewPostManualEdgeEndpoint returns an endpoint function that calls the method
+// "post_manual_edge" of service "graph".
+func NewPostManualEdgeEndpoint(s Service) goa.Endpoint {
+	return func(ctx context.Context, req any) (any, error) {
+		p := req.(*ManualEdgeRequest)
+		return s.PostManualEdge(ctx, p)
 	}
 }

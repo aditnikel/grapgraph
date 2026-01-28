@@ -23,3 +23,15 @@ type SubgraphResponse struct {
 	Edges     []GraphEdge `json:"edges"`
 	Truncated bool        `json:"truncated"`
 }
+
+type ManualEdgeRequest struct {
+	From struct {
+		Type string `json:"type"`
+		Key  string `json:"key"`
+	} `json:"from"`
+	To struct {
+		Type string `json:"type"`
+		Key  string `json:"key"`
+	} `json:"to"`
+	EdgeType string `json:"edge_type"`
+}

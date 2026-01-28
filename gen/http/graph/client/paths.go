@@ -16,3 +16,8 @@ func GetMetadataGraphPath() string {
 func PostSubgraphGraphPath() string {
 	return "/v1/graph/subgraph"
 }
+
+// PostManualEdgeGraphPath returns the URL path to the graph service post_manual_edge HTTP endpoint.
+func PostManualEdgeGraphPath() string {
+	return "/v1/graph/edge"
+}

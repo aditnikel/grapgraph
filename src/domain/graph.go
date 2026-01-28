@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aditnikel/grapgraph/src/config"
 	"github.com/aditnikel/grapgraph/src/graph"
@@ -88,7 +89,24 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 		return true
 	}
 
-	putEdge := func(fromType, fromKey, toType, toKey, edgeType string) bool {
+	asBool := func(v any) bool {
+		switch x := v.(type) {
+		case bool:
+			return x
+		case int:
+			return x != 0
+		case int64:
+			return x != 0
+		case float64:
+			return x != 0
+		case string:
+			return x == "true" || x == "1"
+		default:
+			return false
+		}
+	}
+
+	putEdge := func(fromType, fromKey, toType, toKey, edgeType string, manual bool) bool {
 		if fromType == "" || fromKey == "" || toType == "" || toKey == "" || edgeType == "" {
 			return false
 		}
@@ -109,6 +127,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 			From:     fromID,
 			To:       toID,
 			Directed: true,
+			Manual:   manual,
 		}
 		remainingEdges--
 		return true
@@ -190,6 +209,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 				toType := fmt.Sprint(r["to_type"])
 				toKey := fmt.Sprint(r["to_key"])
 				et := fmt.Sprint(r["edge_type"])
+				manual := asBool(r["edge_manual"])
 
 				if toType == "UNKNOWN" || toKey == "" {
 					continue
@@ -197,7 +217,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 
 				_ = putNode(fromType, fromKey)
 				_ = putNode(toType, toKey)
-				_ = putEdge(fromType, fromKey, toType, toKey, et)
+				_ = putEdge(fromType, fromKey, toType, toKey, et, manual)
 
 				if eid, ok := s.resolveEntityInternalID(ctx, toType, toKey); ok {
 					entityFrontier = append(entityFrontier, entityRef{id: eid})
@@ -245,6 +265,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 					toType := fmt.Sprint(r["to_type"])
 					toKey := fmt.Sprint(r["to_key"])
 					et := fmt.Sprint(r["edge_type"])
+					manual := asBool(r["edge_manual"])
 
 					if toKey == "" || fromType == "UNKNOWN" || fromKey == "" {
 						continue
@@ -252,7 +273,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 
 					_ = putNode(fromType, fromKey)
 					_ = putNode(toType, toKey)
-					_ = putEdge(fromType, fromKey, toType, toKey, et)
+					_ = putEdge(fromType, fromKey, toType, toKey, et, manual)
 
 					if _, ok := seenUsers[toKey]; !ok {
 						seenUsers[toKey] = struct{}{}
@@ -301,6 +322,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 					toType := fmt.Sprint(r["to_type"])
 					toKey := fmt.Sprint(r["to_key"])
 					et := fmt.Sprint(r["edge_type"])
+					manual := asBool(r["edge_manual"])
 
 					if toType == "UNKNOWN" || toKey == "" {
 						continue
@@ -308,7 +330,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 
 					_ = putNode(fromType, fromKey)
 					_ = putNode(toType, toKey)
-					_ = putEdge(fromType, fromKey, toType, toKey, et)
+					_ = putEdge(fromType, fromKey, toType, toKey, et, manual)
 
 					if remainingEdges <= 0 || remainingNodes <= 0 {
 						truncated = true
@@ -326,6 +348,83 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 		Edges:     mapToSliceEdges(edges),
 		Truncated: truncated,
 	}, nil
+}
+
+func (s *GraphService) CreateManualEdge(ctx context.Context, req model.ManualEdgeRequest) (model.GraphEdge, error) {
+	fromType := strings.TrimSpace(strings.ToUpper(req.From.Type))
+	toType := strings.TrimSpace(strings.ToUpper(req.To.Type))
+	fromKey := strings.TrimSpace(req.From.Key)
+	toKey := strings.TrimSpace(req.To.Key)
+	edgeType, err := validateEdgeType(req.EdgeType)
+	if err != nil {
+		return model.GraphEdge{}, err
+	}
+	if fromType == "" || toType == "" {
+		return model.GraphEdge{}, fmt.Errorf("from.type and to.type required")
+	}
+	if fromKey == "" || toKey == "" {
+		return model.GraphEdge{}, fmt.Errorf("from.key and to.key required")
+	}
+
+	fromLabel, fromKeyProp, fromNodeType, ok := nodeSpecForType(fromType)
+	if !ok {
+		return model.GraphEdge{}, fmt.Errorf("invalid from.type: %s", fromType)
+	}
+	toLabel, toKeyProp, toNodeType, ok := nodeSpecForType(toType)
+	if !ok {
+		return model.GraphEdge{}, fmt.Errorf("invalid to.type: %s", toType)
+	}
+
+	if err := s.Repo.UpsertManualEdge(ctx, fromLabel, fromKeyProp, fromKey, toLabel, toKeyProp, toKey, edgeType); err != nil {
+		return model.GraphEdge{}, err
+	}
+
+	fromID := graph.StableNodeID(fromNodeType, fromKey)
+	toID := graph.StableNodeID(toNodeType, toKey)
+
+	return model.GraphEdge{
+		ID:       graph.StableEdgeID(fromID, toID, edgeType),
+		Type:     edgeType,
+		From:     fromID,
+		To:       toID,
+		Directed: true,
+		Manual:   true,
+	}, nil
+}
+
+func nodeSpecForType(t string) (label, keyProp string, nodeType model.NodeType, ok bool) {
+	switch t {
+	case string(model.NodeUser):
+		return "User", "user_id", model.NodeUser, true
+	case string(model.NodeMerchant):
+		return "Merchant", "merchant_id_mpan", model.NodeMerchant, true
+	case string(model.NodeExchange):
+		return "Exchange", "exchange", model.NodeExchange, true
+	case string(model.NodeWallet):
+		return "Wallet", "wallet_address", model.NodeWallet, true
+	case string(model.NodePaymentMethod):
+		return "PaymentMethod", "payment_method", model.NodePaymentMethod, true
+	case string(model.NodeBank):
+		return "Bank", "issuing_bank", model.NodeBank, true
+	case string(model.NodeDevice):
+		return "Device", "device_id", model.NodeDevice, true
+	default:
+		return "", "", "", false
+	}
+}
+
+func validateEdgeType(edgeType string) (string, error) {
+	et := strings.TrimSpace(strings.ToUpper(edgeType))
+	if et == "" {
+		return "", fmt.Errorf("edge_type required")
+	}
+	for _, r := range et {
+		if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' {
+			continue
+		}
+		return "", fmt.Errorf("invalid edge_type: %s", edgeType)
+	}
+	return et, nil
 }
 
 func (s *GraphService) resolveEntityInternalID(ctx context.Context, typ, key string) (int64, bool) {

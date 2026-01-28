@@ -9,6 +9,7 @@ import (
 	"github.com/redis/rueidis"
 
 	"github.com/aditnikel/grapgraph/src/graph"
+	"github.com/aditnikel/grapgraph/src/observability"
 )
 
 func TestHealthPing(t *testing.T) {
@@ -24,7 +25,7 @@ func TestHealthPing(t *testing.T) {
 	}
 	defer rdb.Close()
 
-	repo := graph.New(rdb, graphName, 1500*time.Millisecond)
+	repo := graph.New(rdb, graphName, 1500*time.Millisecond, observability.New("error"))
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 

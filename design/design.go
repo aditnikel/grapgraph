@@ -99,6 +99,17 @@ var _ = Service("graph", func() {
 			Response("bad_request", StatusBadRequest)
 		})
 	})
+
+	Method("post_manual_edge", func() {
+		Description("Creates a manual relationship between two nodes.")
+		Payload(ManualEdgeRequest)
+		Result(GraphEdge)
+		HTTP(func() {
+			POST("/v1/graph/edge")
+			Response(StatusCreated)
+			Response("bad_request", StatusBadRequest)
+		})
+	})
 })
 
 var HealthResponse = Type("HealthResponse", func() {
@@ -186,7 +197,23 @@ var GraphEdge = Type("GraphEdge", func() {
 	Attribute("from", String, "ID of the source node.", func() { Example("USER:u_123") })
 	Attribute("to", String, "ID of the target node.", func() { Example("MERCHANT:m_777") })
 	Attribute("directed", Boolean, "Whether the relationship has a specific flow direction.", func() { Example(true) })
-	Required("id", "type", "from", "to", "directed")
+	Attribute("manual", Boolean, "Whether the relationship was manually added.", func() { Example(false) })
+	Required("id", "type", "from", "to", "directed", "manual")
+})
+
+var NodeRef = Type("NodeRef", func() {
+	Description("A reference to a specific node in the graph.")
+	Attribute("type", String, "Type of the node.", func() { Example("USER") })
+	Attribute("key", String, "The unique key of the node.", func() { Example("u_123") })
+	Required("type", "key")
+})
+
+var ManualEdgeRequest = Type("ManualEdgeRequest", func() {
+	Description("Defines a manually created relationship between two nodes.")
+	Attribute("from", NodeRef, "Source node.")
+	Attribute("to", NodeRef, "Target node.")
+	Attribute("edge_type", String, "Relationship type (e.g. PAYMENT, MANUAL).", func() { Example("MANUAL") })
+	Required("from", "to", "edge_type")
 })
 
 var SubgraphResponse = Type("SubgraphResponse", func() {

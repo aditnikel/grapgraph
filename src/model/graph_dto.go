@@ -14,4 +14,5 @@ type GraphEdge struct {
 	From     string `json:"from"`
 	To       string `json:"to"`
 	Directed bool   `json:"directed"`
+	Manual   bool   `json:"manual"`
 }

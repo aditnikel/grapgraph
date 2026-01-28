@@ -12,6 +12,7 @@ import (
 	"github.com/aditnikel/grapgraph/src/config"
 	"github.com/aditnikel/grapgraph/src/domain"
 	"github.com/aditnikel/grapgraph/src/graph"
+	"github.com/aditnikel/grapgraph/src/observability"
 	"github.com/aditnikel/grapgraph/src/seed"
 )
 
@@ -26,6 +27,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	obsLog := observability.New(cfg.LogLevel)
+
 	rdb, err := rueidis.NewClient(rueidis.ClientOption{
 		InitAddress: cfg.RedisAddrs,
 		Password:    cfg.RedisPassword,
@@ -35,7 +38,7 @@ func main() {
 	}
 	defer rdb.Close()
 
-	repo := graph.New(rdb, cfg.GraphName, cfg.DBTimeout)
+	repo := graph.New(rdb, cfg.GraphName, cfg.DBTimeout, obsLog)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

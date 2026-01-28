@@ -47,7 +47,7 @@ func main() {
 	}
 	defer rdb.Close()
 
-	gRepo := repo.New(rdb, cfg.GraphName, cfg.DBTimeout)
+	gRepo := repo.New(rdb, cfg.GraphName, cfg.DBTimeout, log)
 	gRepo.EnsureSchema(context.Background())
 
 	// Initialize domain services

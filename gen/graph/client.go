@@ -15,15 +15,17 @@ import (
 
 // Client is the "graph" service client.
 type Client struct {
-	GetMetadataEndpoint  goa.Endpoint
-	PostSubgraphEndpoint goa.Endpoint
+	GetMetadataEndpoint    goa.Endpoint
+	PostSubgraphEndpoint   goa.Endpoint
+	PostManualEdgeEndpoint goa.Endpoint
 }
 
 // NewClient initializes a "graph" service client given the endpoints.
-func NewClient(getMetadata, postSubgraph goa.Endpoint) *Client {
+func NewClient(getMetadata, postSubgraph, postManualEdge goa.Endpoint) *Client {
 	return &Client{
-		GetMetadataEndpoint:  getMetadata,
-		PostSubgraphEndpoint: postSubgraph,
+		GetMetadataEndpoint:    getMetadata,
+		PostSubgraphEndpoint:   postSubgraph,
+		PostManualEdgeEndpoint: postManualEdge,
 	}
 }
 
@@ -51,4 +53,17 @@ func (c *Client) PostSubgraph(ctx context.Context, p *SubgraphRequest) (res *Sub
 		return
 	}
 	return ires.(*SubgraphResponse), nil
+}
+
+// PostManualEdge calls the "post_manual_edge" endpoint of the "graph" service.
+// PostManualEdge may return the following errors:
+//   - "bad_request" (type BadRequest)
+//   - error: internal error
+func (c *Client) PostManualEdge(ctx context.Context, p *ManualEdgeRequest) (res *GraphEdge, err error) {
+	var ires any
+	ires, err = c.PostManualEdgeEndpoint(ctx, p)
+	if err != nil {
+		return
+	}
+	return ires.(*GraphEdge), nil
 }

@@ -32,7 +32,8 @@ RETURN
   u.user_id AS from_key,
   ` + NodeTypeCase + ` AS to_type,
   ` + NodeKeyCase + ` AS to_key,
-  type(r) AS edge_type
+  type(r) AS edge_type,
+  coalesce(r.manual, false) AS edge_manual
 LIMIT $limit
 `
 
@@ -46,6 +47,7 @@ RETURN
   'USER' AS to_type,
   u.user_id AS to_key,
   type(r) AS edge_type,
+  coalesce(r.manual, false) AS edge_manual,
   id(u) AS user_internal_id
 LIMIT $limit
 `
@@ -56,4 +58,19 @@ WHERE
   (%s)
 RETURN id(n) AS entity_id
 LIMIT 1
+`
+
+// Relationship type (edge_type) cannot be parameterized in Cypher.
+// It must be validated and safely interpolated by the caller.
+const UpsertManualEdgeTemplate = `
+MERGE (f:%s {%s:$from_key})
+MERGE (t:%s {%s:$to_key})
+MERGE (f)-[r:%s]->(t)
+ON CREATE SET
+  r.manual = true,
+  r.manual_created_at = $ts
+SET
+  r.manual = true,
+  r.manual_updated_at = $ts
+RETURN id(r)
 `

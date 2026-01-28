@@ -68,6 +68,7 @@ func (s *GraphService) PostSubgraph(ctx context.Context, p *graph.SubgraphReques
 			From:     e.From,
 			To:       e.To,
 			Directed: e.Directed,
+			Manual:   e.Manual,
 		}
 	}
 
@@ -77,5 +78,29 @@ func (s *GraphService) PostSubgraph(ctx context.Context, p *graph.SubgraphReques
 		Nodes:     nodes,
 		Edges:     edges,
 		Truncated: resp.Truncated,
+	}, nil
+}
+
+func (s *GraphService) PostManualEdge(ctx context.Context, p *graph.ManualEdgeRequest) (*graph.GraphEdge, error) {
+	req := model.ManualEdgeRequest{
+		EdgeType: p.EdgeType,
+	}
+	req.From.Type = p.From.Type
+	req.From.Key = p.From.Key
+	req.To.Type = p.To.Type
+	req.To.Key = p.To.Key
+
+	edge, err := s.Graph.CreateManualEdge(ctx, req)
+	if err != nil {
+		return nil, graph.BadRequest(err.Error())
+	}
+
+	return &graph.GraphEdge{
+		ID:       edge.ID,
+		Type:     edge.Type,
+		From:     edge.From,
+		To:       edge.To,
+		Directed: edge.Directed,
+		Manual:   edge.Manual,
 	}, nil
 }

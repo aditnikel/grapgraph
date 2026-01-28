@@ -29,7 +29,7 @@ func UsageCommands() []string {
 		"openapi (index|docs)",
 		"health get",
 		"ingest post-event",
-		"graph (get-metadata|post-subgraph)",
+		"graph (get-metadata|post-subgraph|post-manual-edge)",
 	}
 }
 
@@ -73,6 +73,9 @@ func ParseEndpoint(
 
 		graphPostSubgraphFlags    = flag.NewFlagSet("post-subgraph", flag.ExitOnError)
 		graphPostSubgraphBodyFlag = graphPostSubgraphFlags.String("body", "REQUIRED", "")
+
+		graphPostManualEdgeFlags    = flag.NewFlagSet("post-manual-edge", flag.ExitOnError)
+		graphPostManualEdgeBodyFlag = graphPostManualEdgeFlags.String("body", "REQUIRED", "")
 	)
 	openapiFlags.Usage = openapiUsage
 	openapiIndexFlags.Usage = openapiIndexUsage
@@ -87,6 +90,7 @@ func ParseEndpoint(
 	graphFlags.Usage = graphUsage
 	graphGetMetadataFlags.Usage = graphGetMetadataUsage
 	graphPostSubgraphFlags.Usage = graphPostSubgraphUsage
+	graphPostManualEdgeFlags.Usage = graphPostManualEdgeUsage
 
 	if err := flag.CommandLine.Parse(os.Args[1:]); err != nil {
 		return nil, nil, err
@@ -158,6 +162,9 @@ func ParseEndpoint(
 			case "post-subgraph":
 				epf = graphPostSubgraphFlags
 
+			case "post-manual-edge":
+				epf = graphPostManualEdgeFlags
+
 			}
 
 		}
@@ -209,6 +216,9 @@ func ParseEndpoint(
 			case "post-subgraph":
 				endpoint = c.PostSubgraph()
 				data, err = graphc.BuildPostSubgraphPayload(*graphPostSubgraphBodyFlag)
+			case "post-manual-edge":
+				endpoint = c.PostManualEdge()
+				data, err = graphc.BuildPostManualEdgePayload(*graphPostManualEdgeBodyFlag)
 			}
 		}
 	}
@@ -323,6 +333,7 @@ func graphUsage() {
 	fmt.Fprintln(os.Stderr, "COMMAND:")
 	fmt.Fprintln(os.Stderr, `    get-metadata: Returns valid node types, edge types, and supported ranking metrics.`)
 	fmt.Fprintln(os.Stderr, `    post-subgraph: Extracts a surrounding subgraph for a specific root node using multi-hop analysis.`)
+	fmt.Fprintln(os.Stderr, `    post-manual-edge: Creates a manual relationship between two nodes.`)
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Additional help:")
 	fmt.Fprintf(os.Stderr, "    %s graph COMMAND --help\n", os.Args[0])
@@ -359,4 +370,22 @@ func graphPostSubgraphUsage() {
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
 	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "graph post-subgraph --body '{\n      \"edge_types\": [\n         \"PAYMENT\",\n         \"LOGIN\"\n      ],\n      \"hops\": 2,\n      \"limit\": {\n         \"max_edges\": 100,\n         \"max_nodes\": 50\n      },\n      \"root\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      }\n   }'")
+}
+
+func graphPostManualEdgeUsage() {
+	// Header with flags
+	fmt.Fprintf(os.Stderr, "%s [flags] graph post-manual-edge", os.Args[0])
+	fmt.Fprint(os.Stderr, " -body JSON")
+	fmt.Fprintln(os.Stderr)
+
+	// Description
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, `Creates a manual relationship between two nodes.`)
+
+	// Flags list
+	fmt.Fprintln(os.Stderr, `    -body JSON: `)
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Example:")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "graph post-manual-edge --body '{\n      \"edge_type\": \"MANUAL\",\n      \"from\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      },\n      \"to\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      }\n   }'")
 }

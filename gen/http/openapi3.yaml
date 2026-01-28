@@ -20,8 +20,8 @@ paths:
                         application/json:
                             schema:
                                 type: string
-                                example: Ea ut nulla voluptate inventore.
-                            example: Nihil consequuntur laudantium.
+                                example: Id sunt rem.
+                            example: Quia vel et porro incidunt.
     /docs:
         get:
             tags:
@@ -36,8 +36,8 @@ paths:
                         text/html:
                             schema:
                                 type: string
-                                example: Error alias.
-                            example: Velit odit voluptas ab modi tempore.
+                                example: Asperiores deserunt iusto.
+                            example: Ea ut nulla voluptate inventore.
     /healthz:
         get:
             tags:
@@ -73,6 +73,49 @@ paths:
             responses:
                 "200":
                     description: File downloaded
+    /v1/graph/edge:
+        post:
+            tags:
+                - graph
+            summary: post_manual_edge graph
+            description: Creates a manual relationship between two nodes.
+            operationId: graph#post_manual_edge
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ManualEdgeRequest'
+                        example:
+                            edge_type: MANUAL
+                            from:
+                                key: u_123
+                                type: USER
+                            to:
+                                key: u_123
+                                type: USER
+            responses:
+                "201":
+                    description: Created response.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GraphEdge'
+                            example:
+                                directed: true
+                                from: USER:u_123
+                                id: e123
+                                manual: false
+                                to: MERCHANT:m_777
+                                type: PAYMENT
+                "400":
+                    description: 'bad_request: Bad Request response.'
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                                example: Sit iure non corrupti minima est aut.
+                            example: Et est et placeat harum omnis.
     /v1/graph/metadata:
         get:
             tags:
@@ -132,11 +175,13 @@ paths:
                                     - directed: true
                                       from: USER:u_123
                                       id: e123
+                                      manual: false
                                       to: MERCHANT:m_777
                                       type: PAYMENT
                                     - directed: true
                                       from: USER:u_123
                                       id: e123
+                                      manual: false
                                       to: MERCHANT:m_777
                                       type: PAYMENT
                                 nodes:
@@ -163,8 +208,8 @@ paths:
                         application/json:
                             schema:
                                 type: string
-                                example: Et est et placeat harum omnis.
-                            example: Maiores amet soluta repellat.
+                                example: Qui natus ut autem possimus.
+                            example: Ipsa laboriosam error hic autem placeat itaque.
     /v1/ingest/event:
         post:
             tags:
@@ -205,8 +250,8 @@ paths:
                         application/json:
                             schema:
                                 type: string
-                                example: Ipsa laboriosam error hic autem placeat itaque.
-                            example: Sit quod numquam dolores earum quis.
+                                example: Provident facere sapiente.
+                            example: Error alias.
 components:
     schemas:
         BulkCustomerEvents:
@@ -345,6 +390,10 @@ components:
                     type: string
                     description: Unique ID for the specific relationship.
                     example: e123
+                manual:
+                    type: boolean
+                    description: Whether the relationship was manually added.
+                    example: false
                 to:
                     type: string
                     description: ID of the target node.
@@ -358,6 +407,7 @@ components:
                 directed: true
                 from: USER:u_123
                 id: e123
+                manual: false
                 to: MERCHANT:m_777
                 type: PAYMENT
             required:
@@ -366,6 +416,7 @@ components:
                 - from
                 - to
                 - directed
+                - manual
         GraphNode:
             type: object
             properties:
@@ -385,9 +436,7 @@ components:
                     type: object
                     description: Additional key-value properties.
                     example:
-                        Et hic veniam aut.: Possimus consequatur velit ea.
-                        Odit rerum.: Saepe enim aliquid accusamus accusantium.
-                        Quis nam eum dolorum iure nobis.: Doloremque quia quaerat sed eum consequuntur dicta.
+                        Dolorum iure nobis error.: Quia quaerat sed eum consequuntur dicta.
                     additionalProperties: true
                 type:
                     type: string
@@ -399,9 +448,7 @@ components:
                 key: u_123
                 label: User u_123
                 props:
-                    Id sunt rem.: Asperiores deserunt iusto.
-                    Nemo vel odio qui.: Et quo consectetur.
-                    Provident facere sapiente.: Qui natus ut autem possimus.
+                    Hic veniam aut vitae possimus consequatur.: Ea quibusdam odit rerum aliquam saepe.
                 type: USER
             required:
                 - id
@@ -437,6 +484,30 @@ components:
                 accepted: true
             required:
                 - accepted
+        ManualEdgeRequest:
+            type: object
+            properties:
+                edge_type:
+                    type: string
+                    description: Relationship type (e.g. PAYMENT, MANUAL).
+                    example: MANUAL
+                from:
+                    $ref: '#/components/schemas/NodeRef'
+                to:
+                    $ref: '#/components/schemas/NodeRef'
+            description: Defines a manually created relationship between two nodes.
+            example:
+                edge_type: MANUAL
+                from:
+                    key: u_123
+                    type: USER
+                to:
+                    key: u_123
+                    type: USER
+            required:
+                - from
+                - to
+                - edge_type
         MetadataResponse:
             type: object
             properties:
@@ -444,7 +515,7 @@ components:
                     type: array
                     items:
                         type: string
-                        example: Quia vel et porro incidunt.
+                        example: Doloremque et quo consectetur.
                     description: All valid event types.
                     example:
                         - PAYMENT
@@ -454,7 +525,7 @@ components:
                     type: array
                     items:
                         type: string
-                        example: Minima est aut.
+                        example: Ea nemo vel odio.
                     description: All valid entity types.
                     example:
                         - USER
@@ -473,6 +544,24 @@ components:
             required:
                 - node_types
                 - edge_types
+        NodeRef:
+            type: object
+            properties:
+                key:
+                    type: string
+                    description: The unique key of the node.
+                    example: u_123
+                type:
+                    type: string
+                    description: Type of the node.
+                    example: USER
+            description: A reference to a specific node in the graph.
+            example:
+                key: u_123
+                type: USER
+            required:
+                - type
+                - key
         SubgraphRequest:
             type: object
             properties:
@@ -480,7 +569,7 @@ components:
                     type: array
                     items:
                         type: string
-                        example: Ab iusto quasi doloremque et atque sit.
+                        example: Et atque sit veniam quaerat quis.
                     description: Filter to only include these relationship types.
                     example:
                         - PAYMENT
@@ -560,11 +649,13 @@ components:
                         - directed: true
                           from: USER:u_123
                           id: e123
+                          manual: false
                           to: MERCHANT:m_777
                           type: PAYMENT
                         - directed: true
                           from: USER:u_123
                           id: e123
+                          manual: false
                           to: MERCHANT:m_777
                           type: PAYMENT
                 nodes:
@@ -573,6 +664,22 @@ components:
                         $ref: '#/components/schemas/GraphNode'
                     description: List of all entities in the network.
                     example:
+                        - id: USER:u_123
+                          key: u_123
+                          label: User u_123
+                          props:
+                            Et et eum eaque.: Voluptatem earum consectetur iste.
+                            Quaerat officia hic mollitia quae deserunt.: Soluta minima non.
+                            Qui quo dicta.: Aut quis iste nemo ut quisquam aspernatur.
+                          type: USER
+                        - id: USER:u_123
+                          key: u_123
+                          label: User u_123
+                          props:
+                            Et et eum eaque.: Voluptatem earum consectetur iste.
+                            Quaerat officia hic mollitia quae deserunt.: Soluta minima non.
+                            Qui quo dicta.: Aut quis iste nemo ut quisquam aspernatur.
+                          type: USER
                         - id: USER:u_123
                           key: u_123
                           label: User u_123
@@ -607,40 +714,22 @@ components:
                     - directed: true
                       from: USER:u_123
                       id: e123
+                      manual: false
                       to: MERCHANT:m_777
                       type: PAYMENT
                     - directed: true
                       from: USER:u_123
                       id: e123
+                      manual: false
                       to: MERCHANT:m_777
                       type: PAYMENT
                     - directed: true
                       from: USER:u_123
                       id: e123
-                      to: MERCHANT:m_777
-                      type: PAYMENT
-                    - directed: true
-                      from: USER:u_123
-                      id: e123
+                      manual: false
                       to: MERCHANT:m_777
                       type: PAYMENT
                 nodes:
-                    - id: USER:u_123
-                      key: u_123
-                      label: User u_123
-                      props:
-                        Et et eum eaque.: Voluptatem earum consectetur iste.
-                        Quaerat officia hic mollitia quae deserunt.: Soluta minima non.
-                        Qui quo dicta.: Aut quis iste nemo ut quisquam aspernatur.
-                      type: USER
-                    - id: USER:u_123
-                      key: u_123
-                      label: User u_123
-                      props:
-                        Et et eum eaque.: Voluptatem earum consectetur iste.
-                        Quaerat officia hic mollitia quae deserunt.: Soluta minima non.
-                        Qui quo dicta.: Aut quis iste nemo ut quisquam aspernatur.
-                      type: USER
                     - id: USER:u_123
                       key: u_123
                       label: User u_123

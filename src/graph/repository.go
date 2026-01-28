@@ -12,16 +12,18 @@ import (
 
 	"github.com/aditnikel/grapgraph/src/graph/cypher"
 	"github.com/aditnikel/grapgraph/src/model"
+	"github.com/aditnikel/grapgraph/src/observability"
 )
 
 type Repo struct {
 	rdb       rueidis.Client
 	graphName string
 	timeout   time.Duration
+	log       *observability.Logger
 }
 
-func New(rdb rueidis.Client, graphName string, timeout time.Duration) *Repo {
-	return &Repo{rdb: rdb, graphName: graphName, timeout: timeout}
+func New(rdb rueidis.Client, graphName string, timeout time.Duration, log *observability.Logger) *Repo {
+	return &Repo{rdb: rdb, graphName: graphName, timeout: timeout, log: log}
 }
 
 func (g *Repo) interpolate(query string, params map[string]any) string {
@@ -103,6 +105,30 @@ func (g *Repo) UpsertAggregated(ctx context.Context, ev model.CustomerEvent, et 
 	return g.exec(ctx, query, true)
 }
 
+func (g *Repo) UpsertManualEdge(ctx context.Context, fromLabel, fromKeyProp, fromKey, toLabel, toKeyProp, toKey, relType string) error {
+	ctx, cancel := context.WithTimeout(ctx, g.timeout)
+	defer cancel()
+
+	params := map[string]any{
+		"from_key": fromKey,
+		"to_key":   toKey,
+		"ts":       time.Now().UnixMilli(),
+	}
+
+	query := fmt.Sprintf(
+		cypher.UpsertManualEdgeTemplate,
+		fromLabel,
+		fromKeyProp,
+		toLabel,
+		toKeyProp,
+		relType,
+	)
+
+	query = g.interpolate(query, params)
+
+	return g.exec(ctx, query, true)
+}
+
 func (g *Repo) SubgraphHop(ctx context.Context, query string, params map[string]any) (any, error) {
 	ctx, cancel := context.WithTimeout(ctx, g.timeout)
 	defer cancel()
@@ -111,13 +137,46 @@ func (g *Repo) SubgraphHop(ctx context.Context, query string, params map[string]
 		query = g.interpolate(query, params)
 	}
 
+	start := time.Now()
+	if g.log != nil {
+		g.log.Info("graph_query", observability.Fields{
+			"graph": g.graphName,
+			"query": query,
+		})
+	}
+
 	args := []string{g.graphName, query, "--compact"}
 	cmd := g.rdb.B().Arbitrary("GRAPH.QUERY").Args(args...).Build()
 	res := g.rdb.Do(ctx, cmd)
 	if err := res.Error(); err != nil {
+		if g.log != nil {
+			g.log.Error("graph_query_error", observability.Fields{
+				"graph": g.graphName,
+				"query": query,
+				"err":   err.Error(),
+			})
+		}
 		return nil, err
 	}
-	return res.ToAny()
+	respAny, err := res.ToAny()
+	if err != nil {
+		if g.log != nil {
+			g.log.Error("graph_result_decode_error", observability.Fields{
+				"graph": g.graphName,
+				"query": query,
+				"err":   err.Error(),
+			})
+		}
+		return nil, err
+	}
+	if g.log != nil {
+		g.log.Info("graph_result", observability.Fields{
+			"graph":       g.graphName,
+			"duration_ms": time.Since(start).Milliseconds(),
+			"result":      respAny,
+		})
+	}
+	return respAny, nil
 }
 
 func (g *Repo) QueryRows(ctx context.Context, query string, params map[string]any) ([]map[string]any, error) {
@@ -132,6 +191,13 @@ func (g *Repo) exec(ctx context.Context, query string, compact bool) error {
 	args := []string{g.graphName, query}
 	if compact {
 		args = append(args, "--compact")
+	}
+	if g.log != nil {
+		g.log.Debug("graph_exec", observability.Fields{
+			"graph":   g.graphName,
+			"query":   query,
+			"compact": compact,
+		})
 	}
 	cmd := g.rdb.B().Arbitrary("GRAPH.QUERY").Args(args...).Build()
 	return g.rdb.Do(ctx, cmd).Error()

@@ -81,3 +81,36 @@ func BuildPostSubgraphPayload(graphPostSubgraphBody string) (*graph.SubgraphRequ
 
 	return v, nil
 }
+
+// BuildPostManualEdgePayload builds the payload for the graph post_manual_edge
+// endpoint from CLI flags.
+func BuildPostManualEdgePayload(graphPostManualEdgeBody string) (*graph.ManualEdgeRequest, error) {
+	var err error
+	var body PostManualEdgeRequestBody
+	{
+		err = json.Unmarshal([]byte(graphPostManualEdgeBody), &body)
+		if err != nil {
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"edge_type\": \"MANUAL\",\n      \"from\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      },\n      \"to\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      }\n   }'")
+		}
+		if body.From == nil {
+			err = goa.MergeErrors(err, goa.MissingFieldError("from", "body"))
+		}
+		if body.To == nil {
+			err = goa.MergeErrors(err, goa.MissingFieldError("to", "body"))
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	v := &graph.ManualEdgeRequest{
+		EdgeType: body.EdgeType,
+	}
+	if body.From != nil {
+		v.From = marshalNodeRefRequestBodyToGraphNodeRef(body.From)
+	}
+	if body.To != nil {
+		v.To = marshalNodeRefRequestBodyToGraphNodeRef(body.To)
+	}
+
+	return v, nil
+}
