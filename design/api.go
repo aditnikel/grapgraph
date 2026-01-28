@@ -6,7 +6,7 @@ import (
 
 var _ = API("grapgraph", func() {
 	Title("Grapgraph API")
-	Description("High-performance fraud detection and financial network analysis platform built with Goa and FalkorDB.")
+	Description("High-performance fraud detection and financial network analysis platform.")
 	Server("grapgraph", func() {
 		Host("localhost", func() {
 			URI("http://localhost:8080")
