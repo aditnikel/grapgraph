@@ -10,6 +10,8 @@ type SubgraphRequest struct {
 
 	EdgeTypes []string `json:"edge_types"`
 
+	TimeWindowMs int64 `json:"time_window_ms"`
+
 	Limit struct {
 		MaxNodes int `json:"max_nodes"`
 		MaxEdges int `json:"max_edges"`

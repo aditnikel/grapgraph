@@ -171,6 +171,11 @@ var SubgraphRequest = Type("SubgraphRequest", func() {
 	})
 	Attribute("hops", Int, "Number of hops to traverse (1-3).", func() { Default(2); Minimum(1); Maximum(3); Example(2) })
 	Attribute("edge_types", ArrayOf(String), "Filter to only include these relationship types.", func() { Example([]string{"PAYMENT", "LOGIN"}) })
+	Attribute("time_window_ms", Int64, "Only include edges observed within the last N milliseconds. Omit or set to 0 for all time.", func() {
+		Default(0)
+		Minimum(0)
+		Example(int64(2592000000))
+	})
 	Attribute("limit", func() {
 		Description("Resource budget for the response.")
 		Attribute("max_nodes", Int, "Maximum number of nodes to return.", func() { Default(100); Example(50) })

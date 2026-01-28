@@ -37,12 +37,16 @@ func BuildPostSubgraphPayload(graphPostSubgraphBody string) (*graph.SubgraphRequ
 		if body.Hops > 3 {
 			err = goa.MergeErrors(err, goa.InvalidRangeError("body.hops", body.Hops, 3, false))
 		}
+		if body.TimeWindowMs < 0 {
+			err = goa.MergeErrors(err, goa.InvalidRangeError("body.time_window_ms", body.TimeWindowMs, 0, true))
+		}
 		if err != nil {
 			return nil, err
 		}
 	}
 	v := &graph.SubgraphRequest{
-		Hops: body.Hops,
+		Hops:         body.Hops,
+		TimeWindowMs: body.TimeWindowMs,
 	}
 	if body.Root != nil {
 		v.Root = &struct {

@@ -195,6 +195,17 @@
       </select>
     </div>
 
+    <div style="display:flex; flex-direction:column; gap:2px;">
+      <label>Time Window</label>
+      <select id="timeWindow">
+        <option value="0" selected>All time</option>
+        <option value="86400000">Last 24h</option>
+        <option value="604800000">Last 7d</option>
+        <option value="2592000000">Last 30d</option>
+        <option value="7776000000">Last 90d</option>
+      </select>
+    </div>
+
     <button id="loadBtn">Visualize</button>
 
     <div style="display:flex; gap:8px; margin-left: auto;">
@@ -470,6 +481,11 @@
     }
 
     // --- Data Ingestion ---
+    function selectedTimeWindowMs() {
+      const v = parseInt($("timeWindow").value, 10);
+      return Number.isFinite(v) ? v : 0;
+    }
+
     async function loadGraph() {
       const userId = $("userId").value.trim();
       if (!userId) return toast("Enter a User ID", "error");
@@ -479,11 +495,13 @@
       btn.textContent = "Loading...";
       
       try {
+        const timeWindowMs = selectedTimeWindowMs();
         const body = {
           root: { type: "USER", key: userId },
           hops: parseInt($("hops").value),
           limit: { max_nodes: 100, max_edges: 200 }
         };
+        if (timeWindowMs > 0) body.time_window_ms = timeWindowMs;
 
         const res = await fetch(`${API_BASE}/v1/graph/subgraph`, {
           method: "POST", 
@@ -501,7 +519,8 @@
         
         processResponse(data);
         refreshGraph();
-        toast(`Loaded ${data.nodes.length} nodes and ${data.edges.length} edges`);
+        const windowLabel = timeWindowMs > 0 ? ` (window ${$("timeWindow").selectedOptions[0].textContent})` : "";
+        toast(`Loaded ${data.nodes.length} nodes and ${data.edges.length} edges${windowLabel}`);
       } catch (err) {
         toast(`Load failed: ${err.message}`, "error");
       } finally {

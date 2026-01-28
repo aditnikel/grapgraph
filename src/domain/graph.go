@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aditnikel/grapgraph/src/config"
 	"github.com/aditnikel/grapgraph/src/graph"
@@ -50,6 +51,14 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 		edgeTypes = model.AllEventTypes()
 	}
 	quotedEdgeTypes := graph.QuoteEdgeTypes(edgeTypes)
+
+	windowStart := int64(0)
+	if req.TimeWindowMs > 0 {
+		windowStart = time.Now().UnixMilli() - req.TimeWindowMs
+		if windowStart < 0 {
+			windowStart = 0
+		}
+	}
 
 	nodes := map[string]model.GraphNode{}
 	edges := map[string]model.GraphEdge{}
@@ -193,8 +202,9 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 		} else {
 			q := fmt.Sprintf(cypher.UserToEntityTemplate, quotedEdgeTypes)
 			rows, err := s.Repo.QueryRows(ctx, q, map[string]any{
-				"user_id": req.Root.Key,
-				"limit":   limit,
+				"user_id":      req.Root.Key,
+				"limit":        limit,
+				"window_start": windowStart,
 			})
 			if err != nil {
 				return model.SubgraphResponse{}, fmt.Errorf("graph query hop1 failed: %v", err)
@@ -249,8 +259,9 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 
 				q := fmt.Sprintf(cypher.EntityToUserTemplate, quotedEdgeTypes)
 				rows, err := s.Repo.QueryRows(ctx, q, map[string]any{
-					"entity_id": e.id,
-					"limit":     perEntity,
+					"entity_id":    e.id,
+					"limit":        perEntity,
+					"window_start": windowStart,
 				})
 				if err != nil {
 					return model.SubgraphResponse{}, fmt.Errorf("graph query hop2 failed: %v", err)
@@ -306,8 +317,9 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 
 				q := fmt.Sprintf(cypher.UserToEntityTemplate, quotedEdgeTypes)
 				rows, err := s.Repo.QueryRows(ctx, q, map[string]any{
-					"user_id": uid,
-					"limit":   perUser,
+					"user_id":      uid,
+					"limit":        perUser,
+					"window_start": windowStart,
 				})
 				if err != nil {
 					return model.SubgraphResponse{}, fmt.Errorf("graph query hop3 failed: %v", err)

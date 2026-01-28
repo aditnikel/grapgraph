@@ -109,6 +109,8 @@ type SubgraphRequest struct {
 	Hops int
 	// Filter to only include these relationship types.
 	EdgeTypes []string
+	// Only include edges observed within the last N milliseconds.
+	TimeWindowMs int64
 	// Resource budget for the response.
 	Limit *struct {
 		// Maximum number of nodes to return.
