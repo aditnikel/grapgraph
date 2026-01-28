@@ -341,7 +341,7 @@ func graphPostSubgraphUsage() {
 
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
-	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "graph post-subgraph --body '{\n      \"edge_types\": [\n         \"PAYMENT\",\n         \"LOGIN\"\n      ],\n      \"hops\": 2,\n      \"limit\": {\n         \"max_edges\": 100,\n         \"max_nodes\": 50\n      },\n      \"root\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      },\n      \"time_window_ms\": 2592000000\n   }'")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "graph post-subgraph --body '{\n      \"edge_types\": [\n         \"PAYMENT\",\n         \"LOGIN\"\n      ],\n      \"hops\": 2,\n      \"limit\": {\n         \"max_edges\": 100,\n         \"max_nodes\": 50\n      },\n      \"min_event_count\": 2,\n      \"root\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      },\n      \"time_window_ms\": 2592000000\n   }'")
 }
 
 func graphPostManualEdgeUsage() {

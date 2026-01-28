@@ -25,9 +25,10 @@ func (s *GraphService) GetMetadata(ctx context.Context) (*graph.MetadataResponse
 
 func (s *GraphService) PostSubgraph(ctx context.Context, p *graph.SubgraphRequest) (*graph.SubgraphResponse, error) {
 	req := model.SubgraphRequest{
-		Hops:         p.Hops,
-		EdgeTypes:    p.EdgeTypes,
-		TimeWindowMs: p.TimeWindowMs,
+		Hops:          p.Hops,
+		EdgeTypes:     p.EdgeTypes,
+		MinEventCount: p.MinEventCount,
+		TimeWindowMs:  p.TimeWindowMs,
 	}
 
 	req.Root.Type = p.Root.Type

@@ -27,6 +27,7 @@ END
 const UserToEntityTemplate = `
 MATCH (u:User {user_id:$user_id})-[r]->(n)
 WHERE (%s)
+  AND ($min_event_count = 0 OR coalesce(r.event_count, 0) >= $min_event_count)
   AND ($window_start = 0 OR coalesce(r.last_seen, r.manual_updated_at, r.manual_created_at, 0) >= $window_start)
 RETURN
   'USER' AS from_type,
@@ -42,6 +43,7 @@ const EntityToUserTemplate = `
 MATCH (n)<-[r]-(u:User)
 WHERE id(n) = $entity_id
   AND (%s)
+  AND ($min_event_count = 0 OR coalesce(r.event_count, 0) >= $min_event_count)
   AND ($window_start = 0 OR coalesce(r.last_seen, r.manual_updated_at, r.manual_created_at, 0) >= $window_start)
 RETURN
   ` + NodeTypeCase + ` AS from_type,

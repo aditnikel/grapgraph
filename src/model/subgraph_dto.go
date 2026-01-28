@@ -10,6 +10,8 @@ type SubgraphRequest struct {
 
 	EdgeTypes []string `json:"edge_types"`
 
+	MinEventCount int `json:"min_event_count"`
+
 	TimeWindowMs int64 `json:"time_window_ms"`
 
 	Limit struct {

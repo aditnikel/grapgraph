@@ -28,8 +28,11 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 	if req.Root.Key == "" {
 		return model.SubgraphResponse{}, fmt.Errorf("root.key required")
 	}
-	if req.Hops < 1 || req.Hops > 3 {
-		return model.SubgraphResponse{}, fmt.Errorf("hops must be 1..3")
+	if req.Hops < 1 {
+		return model.SubgraphResponse{}, fmt.Errorf("hops must be >= 1")
+	}
+	if req.MinEventCount < 0 {
+		return model.SubgraphResponse{}, fmt.Errorf("min_event_count must be >= 0")
 	}
 
 	if req.Limit.MaxNodes <= 0 {
@@ -40,7 +43,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 	}
 
 	// If specific types are requested, filter by them. Otherwise, include all.
-	var whereClause string
+	whereClause := "true"
 	if len(req.EdgeTypes) > 0 {
 		edgeTypes := make([]string, 0, len(req.EdgeTypes))
 		for _, t := range req.EdgeTypes {
@@ -52,9 +55,9 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 			edgeTypes = append(edgeTypes, string(et))
 		}
 		whereClause = fmt.Sprintf("type(r) IN [%s]", graph.QuoteEdgeTypes(toEventTypes(edgeTypes)))
-	} else {
-		// No filter = all types
-		whereClause = "true" // 1=1
+	}
+	if req.MinEventCount > 0 {
+		whereClause = fmt.Sprintf("(%s) AND coalesce(r.event_count, 0) >= $min_event_count", whereClause)
 	}
 
 	windowStart := int64(0)
@@ -148,111 +151,121 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 	}
 
 	// Tight budget-aware hop limits
-	hop1Limit := func() int {
-		n := remainingEdges / 2
-		if n < 1 {
+	perFrontierLimit := func(frontierLen, total, cap int) int {
+		if frontierLen <= 0 {
 			return 0
 		}
-		if n > 200 {
-			n = 200
-		}
-		return n
-	}
-	hop2PerEntityLimit := func(numEntities int) int {
-		if numEntities <= 0 {
-			return 0
-		}
-		total := remainingEdges * 30 / 100
 		if total < 1 {
 			return 0
 		}
-		per := total / numEntities
+		per := total / frontierLen
 		if per < 1 {
 			per = 1
 		}
-		if per > 50 {
-			per = 50
+		if per > cap {
+			per = cap
 		}
 		return per
 	}
-	hop3PerUserLimit := func(numUsers int) int {
-		if numUsers <= 0 {
-			return 0
+	totalForHop := func(hop int) (int, int) {
+		switch {
+		case hop == 1:
+			return remainingEdges / 2, 200
+		case hop%2 == 0:
+			return remainingEdges * 30 / 100, 50
+		default:
+			return remainingEdges * 20 / 100, 30
 		}
-		total := remainingEdges * 20 / 100
-		if total < 1 {
-			return 0
-		}
-		per := total / numUsers
-		if per < 1 {
-			per = 1
-		}
-		if per > 30 {
-			per = 30
-		}
-		return per
 	}
 
 	type entityRef struct {
 		id int64
 	}
+	userFrontier := []string{req.Root.Key}
 	entityFrontier := []entityRef{}
-	userFrontier := []string{}
 
-	// Hop 1: USER -> ENTITY
-	if req.Hops >= 1 && !truncated {
-		limit := hop1Limit()
-		if limit == 0 {
-			truncated = true
-		} else {
-			q := fmt.Sprintf(cypher.UserToEntityTemplate, whereClause)
-			rows, err := s.Repo.QueryRows(ctx, q, map[string]any{
-				"user_id":      req.Root.Key,
-				"limit":        limit,
-				"window_start": windowStart,
-			})
-			if err != nil {
-				return model.SubgraphResponse{}, fmt.Errorf("graph query hop1 failed: %v", err)
+	for hop := 1; hop <= req.Hops && !truncated; hop++ {
+		if hop%2 == 1 {
+			if len(userFrontier) == 0 {
+				break
+			}
+			total, cap := totalForHop(hop)
+			perUser := perFrontierLimit(len(userFrontier), total, cap)
+			if perUser == 0 {
+				truncated = true
+				break
 			}
 
-			for _, r := range rows {
+			nextEntities := []entityRef{}
+			seenEntities := map[int64]struct{}{}
+			q := fmt.Sprintf(cypher.UserToEntityTemplate, whereClause)
+			for _, uid := range userFrontier {
 				if truncated {
 					break
 				}
-				fromType := fmt.Sprint(r["from_type"])
-				fromKey := fmt.Sprint(r["from_key"])
-				toType := fmt.Sprint(r["to_type"])
-				toKey := fmt.Sprint(r["to_key"])
-				et := fmt.Sprint(r["edge_type"])
-				manual := asBool(r["edge_manual"])
-
-				if toType == "UNKNOWN" || toKey == "" {
-					continue
-				}
-
-				_ = putNode(fromType, fromKey)
-				_ = putNode(toType, toKey)
-				_ = putEdge(fromType, fromKey, toType, toKey, et, manual)
-
-				if eid, ok := s.resolveEntityInternalID(ctx, toType, toKey); ok {
-					entityFrontier = append(entityFrontier, entityRef{id: eid})
-				}
-
 				if remainingEdges <= 0 || remainingNodes <= 0 {
 					truncated = true
 					break
 				}
-			}
-		}
-	}
 
-	// Hop 2: ENTITY -> USER
-	if req.Hops >= 2 && !truncated {
-		perEntity := hop2PerEntityLimit(len(entityFrontier))
-		if perEntity == 0 {
-			truncated = true
+				rows, err := s.Repo.QueryRows(ctx, q, map[string]any{
+					"user_id":         uid,
+					"limit":           perUser,
+					"window_start":    windowStart,
+					"min_event_count": req.MinEventCount,
+				})
+				if err != nil {
+					return model.SubgraphResponse{}, fmt.Errorf("graph query hop%d failed: %v", hop, err)
+				}
+
+				for _, r := range rows {
+					if truncated {
+						break
+					}
+					fromType := fmt.Sprint(r["from_type"])
+					fromKey := fmt.Sprint(r["from_key"])
+					toType := fmt.Sprint(r["to_type"])
+					toKey := fmt.Sprint(r["to_key"])
+					et := fmt.Sprint(r["edge_type"])
+					manual := asBool(r["edge_manual"])
+
+					if toType == "UNKNOWN" || toKey == "" {
+						continue
+					}
+
+					_ = putNode(fromType, fromKey)
+					_ = putNode(toType, toKey)
+					_ = putEdge(fromType, fromKey, toType, toKey, et, manual)
+
+					if eid, ok := s.resolveEntityInternalID(ctx, toType, toKey); ok {
+						if _, seen := seenEntities[eid]; !seen {
+							seenEntities[eid] = struct{}{}
+							nextEntities = append(nextEntities, entityRef{id: eid})
+						}
+					}
+
+					if remainingEdges <= 0 || remainingNodes <= 0 {
+						truncated = true
+						break
+					}
+				}
+			}
+			userFrontier = nil
+			entityFrontier = nextEntities
 		} else {
+			if len(entityFrontier) == 0 {
+				break
+			}
+			total, cap := totalForHop(hop)
+			perEntity := perFrontierLimit(len(entityFrontier), total, cap)
+			if perEntity == 0 {
+				truncated = true
+				break
+			}
+
+			nextUsers := []string{}
 			seenUsers := map[string]struct{}{}
+			q := fmt.Sprintf(cypher.EntityToUserTemplate, whereClause)
 			for _, e := range entityFrontier {
 				if truncated {
 					break
@@ -262,14 +275,14 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 					break
 				}
 
-				q := fmt.Sprintf(cypher.EntityToUserTemplate, whereClause)
 				rows, err := s.Repo.QueryRows(ctx, q, map[string]any{
-					"entity_id":    e.id,
-					"limit":        perEntity,
-					"window_start": windowStart,
+					"entity_id":       e.id,
+					"limit":           perEntity,
+					"window_start":    windowStart,
+					"min_event_count": req.MinEventCount,
 				})
 				if err != nil {
-					return model.SubgraphResponse{}, fmt.Errorf("graph query hop2 failed: %v", err)
+					return model.SubgraphResponse{}, fmt.Errorf("graph query hop%d failed: %v", hop, err)
 				}
 
 				for _, r := range rows {
@@ -293,7 +306,7 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 
 					if _, ok := seenUsers[toKey]; !ok {
 						seenUsers[toKey] = struct{}{}
-						userFrontier = append(userFrontier, toKey)
+						nextUsers = append(nextUsers, toKey)
 					}
 
 					if remainingEdges <= 0 || remainingNodes <= 0 {
@@ -302,59 +315,8 @@ func (s *GraphService) Subgraph(ctx context.Context, req model.SubgraphRequest) 
 					}
 				}
 			}
-		}
-	}
-
-	// Hop 3: USER -> ENTITY
-	if req.Hops >= 3 && !truncated {
-		perUser := hop3PerUserLimit(len(userFrontier))
-		if perUser == 0 {
-			truncated = true
-		} else {
-			for _, uid := range userFrontier {
-				if truncated {
-					break
-				}
-				if remainingEdges <= 0 || remainingNodes <= 0 {
-					truncated = true
-					break
-				}
-
-				q := fmt.Sprintf(cypher.UserToEntityTemplate, whereClause)
-				rows, err := s.Repo.QueryRows(ctx, q, map[string]any{
-					"user_id":      uid,
-					"limit":        perUser,
-					"window_start": windowStart,
-				})
-				if err != nil {
-					return model.SubgraphResponse{}, fmt.Errorf("graph query hop3 failed: %v", err)
-				}
-
-				for _, r := range rows {
-					if truncated {
-						break
-					}
-					fromType := fmt.Sprint(r["from_type"])
-					fromKey := fmt.Sprint(r["from_key"])
-					toType := fmt.Sprint(r["to_type"])
-					toKey := fmt.Sprint(r["to_key"])
-					et := fmt.Sprint(r["edge_type"])
-					manual := asBool(r["edge_manual"])
-
-					if toType == "UNKNOWN" || toKey == "" {
-						continue
-					}
-
-					_ = putNode(fromType, fromKey)
-					_ = putNode(toType, toKey)
-					_ = putEdge(fromType, fromKey, toType, toKey, et, manual)
-
-					if remainingEdges <= 0 || remainingNodes <= 0 {
-						truncated = true
-						break
-					}
-				}
-			}
+			entityFrontier = nil
+			userFrontier = nextUsers
 		}
 	}
 

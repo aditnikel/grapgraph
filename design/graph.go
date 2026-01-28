@@ -49,8 +49,13 @@ var SubgraphRequest = Type("SubgraphRequest", func() {
 		Attribute("key", String, "The unique key of the root node.", func() { Example("u_123") })
 		Required("type", "key")
 	})
-	Attribute("hops", Int, "Number of hops to traverse (1-3).", func() { Default(2); Minimum(1); Maximum(3); Example(2) })
+	Attribute("hops", Int, "Number of hops to traverse (>=1).", func() { Default(2); Minimum(1); Example(2) })
 	Attribute("edge_types", ArrayOf(String), "Filter to only include these relationship types.", func() { Example([]string{"PAYMENT", "LOGIN"}) })
+	Attribute("min_event_count", Int, "Only include edges with at least this event_count. Set to 0 to disable.", func() {
+		Default(0)
+		Minimum(0)
+		Example(2)
+	})
 	Attribute("time_window_ms", Int64, "Only include edges observed within the last N milliseconds. Omit or set to 0 for all time.", func() {
 		Default(0)
 		Minimum(0)

@@ -23,7 +23,7 @@ func BuildPostSubgraphPayload(graphPostSubgraphBody string) (*graph.SubgraphRequ
 	{
 		err = json.Unmarshal([]byte(graphPostSubgraphBody), &body)
 		if err != nil {
-			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"edge_types\": [\n         \"PAYMENT\",\n         \"LOGIN\"\n      ],\n      \"hops\": 2,\n      \"limit\": {\n         \"max_edges\": 100,\n         \"max_nodes\": 50\n      },\n      \"root\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      },\n      \"time_window_ms\": 2592000000\n   }'")
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"edge_types\": [\n         \"PAYMENT\",\n         \"LOGIN\"\n      ],\n      \"hops\": 2,\n      \"limit\": {\n         \"max_edges\": 100,\n         \"max_nodes\": 50\n      },\n      \"min_event_count\": 2,\n      \"root\": {\n         \"key\": \"u_123\",\n         \"type\": \"USER\"\n      },\n      \"time_window_ms\": 2592000000\n   }'")
 		}
 		if body.Root == nil {
 			err = goa.MergeErrors(err, goa.MissingFieldError("root", "body"))
@@ -34,8 +34,8 @@ func BuildPostSubgraphPayload(graphPostSubgraphBody string) (*graph.SubgraphRequ
 		if body.Hops < 1 {
 			err = goa.MergeErrors(err, goa.InvalidRangeError("body.hops", body.Hops, 1, true))
 		}
-		if body.Hops > 3 {
-			err = goa.MergeErrors(err, goa.InvalidRangeError("body.hops", body.Hops, 3, false))
+		if body.MinEventCount < 0 {
+			err = goa.MergeErrors(err, goa.InvalidRangeError("body.min_event_count", body.MinEventCount, 0, true))
 		}
 		if body.TimeWindowMs < 0 {
 			err = goa.MergeErrors(err, goa.InvalidRangeError("body.time_window_ms", body.TimeWindowMs, 0, true))
@@ -45,8 +45,9 @@ func BuildPostSubgraphPayload(graphPostSubgraphBody string) (*graph.SubgraphRequ
 		}
 	}
 	v := &graph.SubgraphRequest{
-		Hops:         body.Hops,
-		TimeWindowMs: body.TimeWindowMs,
+		Hops:          body.Hops,
+		MinEventCount: body.MinEventCount,
+		TimeWindowMs:  body.TimeWindowMs,
 	}
 	if body.Root != nil {
 		v.Root = &struct {
@@ -69,6 +70,12 @@ func BuildPostSubgraphPayload(graphPostSubgraphBody string) (*graph.SubgraphRequ
 		v.EdgeTypes = make([]string, len(body.EdgeTypes))
 		for i, val := range body.EdgeTypes {
 			v.EdgeTypes[i] = val
+		}
+	}
+	{
+		var zero int
+		if v.MinEventCount == zero {
+			v.MinEventCount = 0
 		}
 	}
 	{

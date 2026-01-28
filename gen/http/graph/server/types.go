@@ -22,10 +22,12 @@ type PostSubgraphRequestBody struct {
 		// The unique key of the root node.
 		Key *string `form:"key" json:"key" xml:"key"`
 	} `form:"root,omitempty" json:"root,omitempty" xml:"root,omitempty"`
-	// Number of hops to traverse (1-3).
+	// Number of hops to traverse (>=1).
 	Hops *int `form:"hops,omitempty" json:"hops,omitempty" xml:"hops,omitempty"`
 	// Filter to only include these relationship types.
 	EdgeTypes []string `form:"edge_types,omitempty" json:"edge_types,omitempty" xml:"edge_types,omitempty"`
+	// Only include edges with at least this event_count. Set to 0 to disable.
+	MinEventCount *int `form:"min_event_count,omitempty" json:"min_event_count,omitempty" xml:"min_event_count,omitempty"`
 	// Only include edges observed within the last N milliseconds. Omit or set to 0
 	// for all time.
 	TimeWindowMs *int64 `form:"time_window_ms,omitempty" json:"time_window_ms,omitempty" xml:"time_window_ms,omitempty"`
@@ -207,6 +209,9 @@ func NewPostSubgraphSubgraphRequest(body *PostSubgraphRequestBody) *graph.Subgra
 	if body.Hops != nil {
 		v.Hops = *body.Hops
 	}
+	if body.MinEventCount != nil {
+		v.MinEventCount = *body.MinEventCount
+	}
 	if body.TimeWindowMs != nil {
 		v.TimeWindowMs = *body.TimeWindowMs
 	}
@@ -227,6 +232,9 @@ func NewPostSubgraphSubgraphRequest(body *PostSubgraphRequestBody) *graph.Subgra
 		for i, val := range body.EdgeTypes {
 			v.EdgeTypes[i] = val
 		}
+	}
+	if body.MinEventCount == nil {
+		v.MinEventCount = 0
 	}
 	if body.TimeWindowMs == nil {
 		v.TimeWindowMs = 0
@@ -278,9 +286,9 @@ func ValidatePostSubgraphRequestBody(body *PostSubgraphRequestBody) (err error) 
 			err = goa.MergeErrors(err, goa.InvalidRangeError("body.hops", *body.Hops, 1, true))
 		}
 	}
-	if body.Hops != nil {
-		if *body.Hops > 3 {
-			err = goa.MergeErrors(err, goa.InvalidRangeError("body.hops", *body.Hops, 3, false))
+	if body.MinEventCount != nil {
+		if *body.MinEventCount < 0 {
+			err = goa.MergeErrors(err, goa.InvalidRangeError("body.min_event_count", *body.MinEventCount, 0, true))
 		}
 	}
 	if body.TimeWindowMs != nil {

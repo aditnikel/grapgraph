@@ -105,10 +105,12 @@ type SubgraphRequest struct {
 		// The unique key of the root node.
 		Key string
 	}
-	// Number of hops to traverse (1-3).
+	// Number of hops to traverse (>=1).
 	Hops int
 	// Filter to only include these relationship types.
 	EdgeTypes []string
+	// Only include edges with at least this event_count. Set to 0 to disable.
+	MinEventCount int
 	// Only include edges observed within the last N milliseconds. Omit or set to 0
 	// for all time.
 	TimeWindowMs int64

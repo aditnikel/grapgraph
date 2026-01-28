@@ -22,10 +22,12 @@ type PostSubgraphRequestBody struct {
 		// The unique key of the root node.
 		Key string `form:"key" json:"key" xml:"key"`
 	} `form:"root" json:"root" xml:"root"`
-	// Number of hops to traverse (1-3).
+	// Number of hops to traverse (>=1).
 	Hops int `form:"hops" json:"hops" xml:"hops"`
 	// Filter to only include these relationship types.
 	EdgeTypes []string `form:"edge_types,omitempty" json:"edge_types,omitempty" xml:"edge_types,omitempty"`
+	// Only include edges with at least this event_count. Set to 0 to disable.
+	MinEventCount int `form:"min_event_count" json:"min_event_count" xml:"min_event_count"`
 	// Only include edges observed within the last N milliseconds. Omit or set to 0
 	// for all time.
 	TimeWindowMs int64 `form:"time_window_ms" json:"time_window_ms" xml:"time_window_ms"`
@@ -132,8 +134,9 @@ type NodeRefRequestBody struct {
 // the "post_subgraph" endpoint of the "graph" service.
 func NewPostSubgraphRequestBody(p *graph.SubgraphRequest) *PostSubgraphRequestBody {
 	body := &PostSubgraphRequestBody{
-		Hops:         p.Hops,
-		TimeWindowMs: p.TimeWindowMs,
+		Hops:          p.Hops,
+		MinEventCount: p.MinEventCount,
+		TimeWindowMs:  p.TimeWindowMs,
 	}
 	if p.Root != nil {
 		body.Root = &struct {
@@ -156,6 +159,12 @@ func NewPostSubgraphRequestBody(p *graph.SubgraphRequest) *PostSubgraphRequestBo
 		body.EdgeTypes = make([]string, len(p.EdgeTypes))
 		for i, val := range p.EdgeTypes {
 			body.EdgeTypes[i] = val
+		}
+	}
+	{
+		var zero int
+		if body.MinEventCount == zero {
+			body.MinEventCount = 0
 		}
 	}
 	{
