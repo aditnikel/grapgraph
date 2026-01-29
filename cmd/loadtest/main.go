@@ -15,38 +15,80 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aditnikel/grapgraph/gen/ingest"
+	"github.com/aditnikel/grapgraph/gen/graph"
+	graphclient "github.com/aditnikel/grapgraph/gen/http/graph/client"
 	ingestclient "github.com/aditnikel/grapgraph/gen/http/ingest/client"
+	"github.com/aditnikel/grapgraph/gen/ingest"
 )
 
 var (
-	targetURL   = flag.String("url", "http://localhost:8080/v1/ingest/event", "Target URL")
-	numWorkers  = flag.Int("workers", 10, "Number of concurrent workers")
-	duration    = flag.Duration("duration", 10*time.Second, "Duration of the load test")
-	timeout     = flag.Duration("timeout", 5*time.Second, "HTTP client timeout")
-	minEvents   = flag.Int("min-events", 1, "Minimum events per request")
-	maxEvents   = flag.Int("max-events", 5, "Maximum events per request")
-	pace        = flag.Duration("pace", 0, "Optional sleep between requests per worker")
-	eventTypes  = flag.String("event-types", "LOGOUT,WITHDRAWAL,KYC_UPDATE,PROFILE_UPDATE,PAYMENT,ACCOUNT_UPDATE,CUSTOMER_EVENT,TRANSACTION,KYC,REGISTER,PASSWORD_CHANGE,LOGIN,MANUAL", "Comma-separated event types")
-	errorLog    = flag.String("error-log", "", "Write request errors to this file (append). Empty disables.")
-	totalReqs   atomic.Uint64
-	successReqs atomic.Uint64
-	failedReqs  atomic.Uint64
+	targetURL         = flag.String("url", "http://localhost:8080/v1/ingest/event", "Target URL")
+	scenario          = flag.String("scenario", "ingest", "Load test scenario: ingest|graph-subgraph|graph-metadata")
+	numWorkers        = flag.Int("workers", 10, "Number of concurrent workers")
+	duration          = flag.Duration("duration", 10*time.Second, "Duration of the load test")
+	timeout           = flag.Duration("timeout", 5*time.Second, "HTTP client timeout")
+	minEvents         = flag.Int("min-events", 1, "Minimum events per request")
+	maxEvents         = flag.Int("max-events", 5, "Maximum events per request")
+	pace              = flag.Duration("pace", 0, "Optional sleep between requests per worker")
+	eventTypes        = flag.String("event-types", "LOGOUT,WITHDRAWAL,KYC_UPDATE,PROFILE_UPDATE,PAYMENT,ACCOUNT_UPDATE,CUSTOMER_EVENT,TRANSACTION,KYC,REGISTER,PASSWORD_CHANGE,LOGIN,MANUAL", "Comma-separated event types")
+	graphRootType     = flag.String("graph-root-type", "USER", "Root node type for graph subgraph requests")
+	graphRootPrefix   = flag.String("graph-root-prefix", "user_", "Root node key prefix for graph subgraph requests")
+	graphRootMax      = flag.Int("graph-root-max", 1000, "Max integer suffix (exclusive) for graph root keys")
+	graphHops         = flag.Int("graph-hops", 5, "Graph subgraph hops (>=1)")
+	graphMaxNodes     = flag.Int("graph-max-nodes", 100, "Graph subgraph max nodes")
+	graphMaxEdges     = flag.Int("graph-max-edges", 200, "Graph subgraph max edges")
+	graphMinEvent     = flag.Int("graph-min-event-count", 0, "Graph subgraph minimum event count per edge")
+	graphTimeWindowMs = flag.Int64("graph-time-window-ms", 0, "Graph subgraph time window in ms (0 = all)")
+	graphEdgeTypes    = flag.String("graph-edge-types", "", "Comma-separated edge types for graph subgraph (empty = all)")
+	errorLog          = flag.String("error-log", "", "Write request errors to this file (append). Empty disables.")
+	totalReqs         atomic.Uint64
+	successReqs       atomic.Uint64
+	failedReqs        atomic.Uint64
 )
 
 var errLogger *log.Logger
 var parsedEventTypes []string
+var parsedGraphEdgeTypes []string
+var scenarioMode string
 
 func main() {
 	flag.Parse()
 
-	if *minEvents < 1 || *maxEvents < 1 || *minEvents > *maxEvents {
-		log.Fatalf("Invalid event bounds: min-events=%d max-events=%d", *minEvents, *maxEvents)
-	}
+	scenarioMode = strings.ToLower(strings.TrimSpace(*scenario))
+	switch scenarioMode {
+	case "ingest":
+		if *minEvents < 1 || *maxEvents < 1 || *minEvents > *maxEvents {
+			log.Fatalf("Invalid event bounds: min-events=%d max-events=%d", *minEvents, *maxEvents)
+		}
 
-	parsedEventTypes = parseEventTypes(*eventTypes)
-	if len(parsedEventTypes) == 0 {
-		log.Fatalf("Invalid event-types: %q", *eventTypes)
+		parsedEventTypes = parseEventTypes(*eventTypes)
+		if len(parsedEventTypes) == 0 {
+			log.Fatalf("Invalid event-types: %q", *eventTypes)
+		}
+	case "graph-subgraph":
+		if *graphRootType == "" {
+			log.Fatalf("Invalid graph-root-type: %q", *graphRootType)
+		}
+		if *graphRootMax < 1 {
+			log.Fatalf("Invalid graph-root-max: %d", *graphRootMax)
+		}
+		if *graphHops < 1 {
+			log.Fatalf("Invalid graph-hops: %d", *graphHops)
+		}
+		if *graphMaxNodes < 1 || *graphMaxEdges < 1 {
+			log.Fatalf("Invalid graph limits: graph-max-nodes=%d graph-max-edges=%d", *graphMaxNodes, *graphMaxEdges)
+		}
+		if *graphMinEvent < 0 {
+			log.Fatalf("Invalid graph-min-event-count: %d", *graphMinEvent)
+		}
+		if *graphTimeWindowMs < 0 {
+			log.Fatalf("Invalid graph-time-window-ms: %d", *graphTimeWindowMs)
+		}
+		parsedGraphEdgeTypes = parseEventTypes(*graphEdgeTypes)
+	case "graph-metadata":
+		// No additional validation.
+	default:
+		log.Fatalf("Unknown scenario: %q (expected ingest|graph-subgraph|graph-metadata)", *scenario)
 	}
 
 	if *errorLog != "" {
@@ -58,7 +100,7 @@ func main() {
 		errLogger = log.New(f, "", log.LstdFlags)
 	}
 
-	log.Printf("Starting load test with %d workers for %v...", *numWorkers, *duration)
+	log.Printf("Starting %s load test with %d workers for %v (url=%s)...", scenarioMode, *numWorkers, *duration, *targetURL)
 
 	var wg sync.WaitGroup
 	start := time.Now()
@@ -97,6 +139,19 @@ func main() {
 }
 
 func sendRequest(client *http.Client, rng *rand.Rand) {
+	switch scenarioMode {
+	case "ingest":
+		sendIngestRequest(client, rng)
+	case "graph-subgraph":
+		sendGraphSubgraphRequest(client, rng)
+	case "graph-metadata":
+		sendGraphMetadataRequest(client)
+	default:
+		log.Printf("Unknown scenario %q", scenarioMode)
+	}
+}
+
+func sendIngestRequest(client *http.Client, rng *rand.Rand) {
 	payload := generatePayload(rng)
 	reqBody := ingestclient.NewPostEventRequestBody(payload)
 	data, err := json.Marshal(reqBody)
@@ -118,14 +173,89 @@ func sendRequest(client *http.Client, rng *rand.Rand) {
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		successReqs.Add(1)
+		return
+	}
+
+	failedReqs.Add(1)
+	body, _ := io.ReadAll(resp.Body)
+	if len(body) > 0 {
+		logErrorf("server error: %s body=%s", resp.Status, bytes.TrimSpace(body))
 	} else {
+		logErrorf("server error: %s", resp.Status)
+	}
+}
+
+func sendGraphSubgraphRequest(client *http.Client, rng *rand.Rand) {
+	payload := generateSubgraphPayload(rng)
+	reqBody := graphclient.NewPostSubgraphRequestBody(payload)
+	data, err := json.Marshal(reqBody)
+	if err != nil {
+		log.Printf("Failed to marshal graph payload: %v", err)
+		logErrorf("marshal error: %v", err)
+		return
+	}
+
+	req, err := http.NewRequest(http.MethodPost, *targetURL, bytes.NewReader(data))
+	if err != nil {
+		log.Printf("Failed to build graph request: %v", err)
+		logErrorf("request build failed: %v", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	totalReqs.Add(1)
+	if err != nil {
 		failedReqs.Add(1)
-		body, _ := io.ReadAll(resp.Body)
-		if len(body) > 0 {
-			logErrorf("server error: %s body=%s", resp.Status, bytes.TrimSpace(body))
-		} else {
-			logErrorf("server error: %s", resp.Status)
-		}
+		log.Printf("Request failed: %v", err)
+		logErrorf("request failed: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		successReqs.Add(1)
+		return
+	}
+
+	failedReqs.Add(1)
+	body, _ := io.ReadAll(resp.Body)
+	if len(body) > 0 {
+		logErrorf("server error: %s body=%s", resp.Status, bytes.TrimSpace(body))
+	} else {
+		logErrorf("server error: %s", resp.Status)
+	}
+}
+
+func sendGraphMetadataRequest(client *http.Client) {
+	req, err := http.NewRequest(http.MethodGet, *targetURL, nil)
+	if err != nil {
+		log.Printf("Failed to build graph metadata request: %v", err)
+		logErrorf("request build failed: %v", err)
+		return
+	}
+
+	resp, err := client.Do(req)
+	totalReqs.Add(1)
+	if err != nil {
+		failedReqs.Add(1)
+		log.Printf("Request failed: %v", err)
+		logErrorf("request failed: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		successReqs.Add(1)
+		return
+	}
+
+	failedReqs.Add(1)
+	body, _ := io.ReadAll(resp.Body)
+	if len(body) > 0 {
+		logErrorf("server error: %s body=%s", resp.Status, bytes.TrimSpace(body))
+	} else {
+		logErrorf("server error: %s", resp.Status)
 	}
 }
 
@@ -164,6 +294,35 @@ func generatePayload(rng *rand.Rand) *ingest.BulkCustomerEvents {
 	return &ingest.BulkCustomerEvents{
 		Events: events,
 	}
+}
+
+func generateSubgraphPayload(rng *rand.Rand) *graph.SubgraphRequest {
+	key := fmt.Sprintf("%s%d", *graphRootPrefix, rng.Intn(*graphRootMax))
+	req := &graph.SubgraphRequest{
+		Root: &struct {
+			Type string
+			Key  string
+		}{
+			Type: *graphRootType,
+			Key:  key,
+		},
+		Hops:          *graphHops,
+		MinEventCount: *graphMinEvent,
+		TimeWindowMs:  *graphTimeWindowMs,
+		Limit: &struct {
+			MaxNodes int
+			MaxEdges int
+		}{
+			MaxNodes: *graphMaxNodes,
+			MaxEdges: *graphMaxEdges,
+		},
+	}
+
+	if len(parsedGraphEdgeTypes) > 0 {
+		req.EdgeTypes = append([]string(nil), parsedGraphEdgeTypes...)
+	}
+
+	return req
 }
 
 func printReport(elapsed time.Duration) {
