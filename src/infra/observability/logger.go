@@ -39,10 +39,8 @@ func (l *Logger) log(level, msg string, f Fields) {
 		"level": level,
 		"msg":   msg,
 	}
-	if f != nil {
-		for k, v := range f {
-			m[k] = v
-		}
+	for k, v := range f {
+		m[k] = v
 	}
 
 	b, err := json.Marshal(m)
