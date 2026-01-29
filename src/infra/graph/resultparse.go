@@ -1,6 +1,9 @@
 package graph
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 // FalkorDB compact format: [header, rows, stats]
 func ParseCompact(resp any) ([]map[string]any, error) {
@@ -13,9 +16,9 @@ func ParseCompact(resp any) ([]map[string]any, error) {
 	if !ok {
 		return nil, fmt.Errorf("unexpected header shape")
 	}
-	cols := make([]string, 0, len(headerAny))
-	for _, c := range headerAny {
-		cols = append(cols, fmt.Sprint(unpackCell(c)))
+	cols := make([]string, len(headerAny))
+	for i, c := range headerAny {
+		cols[i] = cellToString(unpackCell(c))
 	}
 
 	rowsAny, ok := arr[1].([]any)
@@ -29,7 +32,7 @@ func ParseCompact(resp any) ([]map[string]any, error) {
 		if !ok {
 			continue
 		}
-		m := map[string]any{}
+		m := make(map[string]any, len(cols))
 		for i := 0; i < len(cols) && i < len(rowArr); i++ {
 			m[cols[i]] = unpackCell(rowArr[i])
 		}
@@ -44,4 +47,25 @@ func unpackCell(v any) any {
 		return arr[1]
 	}
 	return v
+}
+
+func cellToString(v any) string {
+	switch t := v.(type) {
+	case string:
+		return t
+	case []byte:
+		return string(t)
+	case fmt.Stringer:
+		return t.String()
+	case int:
+		return strconv.Itoa(t)
+	case int64:
+		return strconv.FormatInt(t, 10)
+	case float64:
+		return strconv.FormatFloat(t, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(t)
+	default:
+		return fmt.Sprint(t)
+	}
 }
