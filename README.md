@@ -70,6 +70,42 @@
 
 ---
 
+## 🧪 Load Testing
+
+The load tester supports multiple scenarios. Use `-scenario` and set the URL for the endpoint you want to stress.
+
+### Ingest (default)
+
+```bash
+go run cmd/loadtest/main.go -url http://localhost:8080/v1/ingest/event
+```
+
+### Graph Subgraph
+
+```bash
+go run cmd/loadtest/main.go -scenario graph-subgraph -url http://localhost:8080/v1/graph/subgraph
+```
+
+Optional graph tuning flags:
+
+- `-graph-root-type` (default `USER`)
+- `-graph-root-prefix` (default `user_`)
+- `-graph-root-max` (default `1000`)
+- `-graph-hops` (default `5`)
+- `-graph-max-nodes` (default `100`)
+- `-graph-max-edges` (default `200`)
+- `-graph-min-event-count` (default `0`)
+- `-graph-time-window-ms` (default `0`)
+- `-graph-edge-types` (default empty for all)
+
+### Graph Metadata
+
+```bash
+go run cmd/loadtest/main.go -scenario graph-metadata -url http://localhost:8080/v1/graph/metadata
+```
+
+---
+
 ## 📡 API Documentation
 
 ### 🏁 Health Check
